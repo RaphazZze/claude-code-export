@@ -37,10 +37,10 @@ Claude Code stores every conversation as a raw `.jsonl` file. This tool parses t
 python3 claudecode_export.py <file.jsonl>
 
 # With user name and 24-hour time
-python3 claudecode_export.py <file.jsonl> --name Dario --time 24
+python3 claudecode_export.py <file.jsonl> --name Boris --time 24
 
 # Batch export to a specific directory
-python3 claudecode_export.py *.jsonl -o exports/ --name Dario
+python3 claudecode_export.py *.jsonl -o exports/ --name Boris
 
 # Full help
 python3 claudecode_export.py --help
