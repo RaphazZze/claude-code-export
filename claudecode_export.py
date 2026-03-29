@@ -332,6 +332,37 @@ def convert(jsonl_path, user_label, time_format):
     output = output.replace(home_dir + '/', '~/')
     output = output.replace(home_dir, '~')
 
+    # 3b. Normalize cloud storage / iCloud app paths that reveal Mac setup
+    #     iCloud app vaults: ~/Library/Mobile Documents/iCloud~vendor~app/Documents/
+    #     Extract the app name from the bundle-style segment (last ~-delimited token).
+    output = re.sub(
+        r'~/Library/Mobile Documents/iCloud~[^/~]+~([^/]+)/Documents/',
+        lambda m: f'<{m.group(1).capitalize()}>/',
+        output,
+    )
+    # Anything else under ~/Library/Mobile Documents/ (other iCloud containers)
+    output = output.replace('~/Library/Mobile Documents/', '<iCloud>/')
+    # Google Drive — newer mount point (~/Library/CloudStorage/GoogleDrive-account/My Drive/)
+    output = re.sub(
+        r'~/Library/CloudStorage/GoogleDrive-[^/]+/My Drive/',
+        '<Google Drive>/',
+        output,
+    )
+    # Google Drive — legacy ~/My Drive/ mount
+    output = output.replace('~/My Drive/', '<Google Drive>/')
+    # OneDrive
+    output = re.sub(
+        r'~/Library/CloudStorage/OneDrive[^/]*/',
+        '<OneDrive>/',
+        output,
+    )
+    # Dropbox
+    output = re.sub(
+        r'~/Library/CloudStorage/Dropbox[^/]*/',
+        '<Dropbox>/',
+        output,
+    )
+
     # 4. Remaining bare relative paths (no spaces — common case)
     output = re.sub(r'(?<!`)(\b[\w.~-]+/[\w./_-]+\.\w+)(?!`)', r'`\1`', output)
 
@@ -455,7 +486,8 @@ def main():
             print(f"  FAIL  {jsonl_path.name}: {e}", file=sys.stderr)
             failed += 1
 
-    print(f"\nDone — {total_files} file(s) exported to {out_dir.resolve()}")
+    display_dir = str(out_dir.resolve()).replace(str(Path.home()), '~')
+    print(f"\nDone — {total_files} file(s) exported to {display_dir}")
     if failed:
         print(f"  {failed} file(s) failed.", file=sys.stderr)
         sys.exit(1)
