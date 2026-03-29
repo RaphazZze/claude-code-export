@@ -395,7 +395,7 @@ def main():
         description="Convert Claude Code .jsonl conversations to Markdown.",
         epilog="Examples:\n"
                "  python3 export_conversation.py session.jsonl\n"
-               "  python3 export_conversation.py *.jsonl -o exports/ --name Dario\n"
+               "  python3 export_conversation.py *.jsonl -o exports/ --name Boris\n"
                "  python3 export_conversation.py *.jsonl --time 24\n",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
