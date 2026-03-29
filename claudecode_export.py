@@ -9,7 +9,7 @@ Usage:
     python3 claudecode_export.py <file.jsonl> [file2.jsonl ...]
     python3 claudecode_export.py *.jsonl
     python3 claudecode_export.py <file.jsonl> -o /output/dir
-    python3 claudecode_export.py <file.jsonl> --name "Dario" --time 24
+    python3 claudecode_export.py <file.jsonl> --name "Boris" --time 24
 """
 
 import json, os, sys, re, argparse
