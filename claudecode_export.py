@@ -366,7 +366,9 @@ def convert(jsonl_path, user_label, time_format):
     # 4. Remaining bare relative paths (no spaces — common case)
     output = re.sub(r'(?<!`)(\b[\w.~-]+/[\w./_-]+\.\w+)(?!`)', r'`\1`', output)
 
-    return output, len(deduped), first_timestamp
+    user_count = sum(1 for r, _, _, _ in deduped if r == 'user')
+    assistant_count = sum(1 for r, _, _, _ in deduped if r == 'assistant')
+    return output, (user_count, assistant_count), first_timestamp
 
 
 def count_messages(jsonl_path):
@@ -410,13 +412,17 @@ def count_messages(jsonl_path):
                 elif isinstance(content, str) and content.strip():
                     messages.append((role, content.strip()))
     # Deduplicate consecutive identical (role, text) pairs — matches convert() logic
-    deduped = 0
+    user_count = 0
+    assistant_count = 0
     prev = None
     for m in messages:
         if m != prev:
-            deduped += 1
+            if m[0] == 'user':
+                user_count += 1
+            else:
+                assistant_count += 1
             prev = m
-    return deduped
+    return user_count, assistant_count
 
 
 # ── CLI ─────────────────────────────────────────────────────────────────────
@@ -444,8 +450,8 @@ def main():
             if not jsonl_path.exists() or jsonl_path.suffix != '.jsonl':
                 continue
             try:
-                n = count_messages(jsonl_path)
-                print(f"{jsonl_path.name}\t{n}")
+                user_c, asst_c = count_messages(jsonl_path)
+                print(f"{jsonl_path.name}\t{user_c + asst_c}\t({user_c} user, {asst_c} Claude)")
             except Exception as e:
                 print(f"{jsonl_path.name}\tERROR: {e}", file=sys.stderr)
         return
@@ -471,7 +477,7 @@ def main():
             continue
 
         try:
-            md, count, start_dt = convert(jsonl_path, args.name, args.time)
+            md, (user_c, asst_c), start_dt = convert(jsonl_path, args.name, args.time)
             short_id = jsonl_path.stem[:5]
             if start_dt:
                 stamp = start_dt.strftime('%Y-%m-%d_%H%M')
@@ -480,7 +486,7 @@ def main():
             out_path = out_dir / f"conversation_export_{stamp}_{short_id}.md"
             with open(out_path, 'w', encoding='utf-8') as f:
                 f.write(md)
-            print(f"  OK    {jsonl_path.name} → {out_path.name}  ({count} messages)")
+            print(f"  OK    {jsonl_path.name} → {out_path.name}  ({user_c + asst_c} messages: {user_c} user, {asst_c} Claude)")
             total_files += 1
         except Exception as e:
             print(f"  FAIL  {jsonl_path.name}: {e}", file=sys.stderr)
