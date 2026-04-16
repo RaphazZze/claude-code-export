@@ -1,10 +1,10 @@
 # claude-code-export
 
-Convert Claude Code `.jsonl` conversation files into clean, readable Markdown.
+Convert Claude Code `.jsonl` session files into clean, readable Markdown.
 
 ## What it does
 
-Claude Code stores every conversation as a raw `.jsonl` file. This tool parses those files and produces a Markdown export suitable for archiving, sharing, or reviewing past sessions.
+Claude Code stores every session as a raw `.jsonl` file. This tool parses those files and produces a Markdown export suitable for archiving, sharing, or reviewing past sessions.
 
 ### What's kept
 
@@ -56,15 +56,15 @@ python3 claudecode_export.py --help
 
 ### Output filename
 
-Files are named `conversation_export_<date>_<time>_<id>.md` where:
-- `<date>_<time>` is when the conversation started (local timezone)
+Files are named `session_export_<date>_<time>_<id>.md` where:
+- `<date>_<time>` is when the session started (local timezone)
 - `<id>` is the first 5 characters of the session UUID (to avoid collisions)
 
-Example: `conversation_export_2026-03-24_1807_ffaab.md`
+Example: `session_export_2026-03-24_1807_ffaab.md`
 
 ## Where are the .jsonl files?
 
-Claude Code stores conversations per project at:
+Claude Code stores sessions per project at:
 
 ```
 ~/.claude/projects/<project-folder>/*.jsonl

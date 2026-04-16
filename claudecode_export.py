@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-claude-code-export — Convert Claude Code .jsonl conversation files to clean Markdown.
+claude-code-export — Convert Claude Code .jsonl session files to clean Markdown.
 
 Strips tool calls, tool results, thinking blocks, and code execution output.
 Keeps only human-readable dialogue. Replaces absolute paths with relative ones.
@@ -93,7 +93,7 @@ def parse_timestamp(ts_raw, time_format):
 # ── Core conversion ────────────────────────────────────────────────────────
 
 def convert(jsonl_path, user_label, time_format):
-    """Parse a .jsonl conversation file and return (markdown_string, message_count, start_datetime)."""
+    """Parse a .jsonl session file and return (markdown_string, message_count, start_datetime)."""
 
     # First pass: find project root and first timestamp from first non-snapshot record
     project_root = None
@@ -266,7 +266,7 @@ def convert(jsonl_path, user_label, time_format):
 
     # Build Markdown
     lines = []
-    lines.append(f"# Claude Code Conversation Export")
+    lines.append(f"# Claude Code Session Export")
     lines.append(f"**Source:** `{jsonl_path.name}`  ")
     lines.append(f"**Exported:** {datetime.now().strftime('%Y-%m-%d')}")
     lines.append("")
@@ -429,7 +429,7 @@ def count_messages(jsonl_path):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Convert Claude Code .jsonl conversations to Markdown.",
+        description="Convert Claude Code .jsonl sessions to Markdown.",
         epilog="Examples:\n"
                "  python3 export_conversation.py session.jsonl\n"
                "  python3 export_conversation.py *.jsonl -o exports/ --name Boris\n"
@@ -483,7 +483,7 @@ def main():
                 stamp = start_dt.strftime('%Y-%m-%d_%H%M')
             else:
                 stamp = jsonl_path.stem
-            out_path = out_dir / f"conversation_export_{stamp}_{short_id}.md"
+            out_path = out_dir / f"session_export_{stamp}_{short_id}.md"
             with open(out_path, 'w', encoding='utf-8') as f:
                 f.write(md)
             print(f"  OK    {jsonl_path.name} → {out_path.name}  ({user_c + asst_c} messages: {user_c} user, {asst_c} Claude)")
