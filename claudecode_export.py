@@ -472,13 +472,26 @@ def main():
     parser.add_argument("-n", "--name", default="User", help="label for user messages (default: User)")
     parser.add_argument("-t", "--time", choices=["12", "24"], default="12", help="time format (default: 12)")
     parser.add_argument("-c", "--count-only", action="store_true", help="print message counts without exporting")
+    parser.add_argument(
+        "-a", "--include-sub-agents",
+        action="store_true",
+        help="include sub-agent session files (agent-*.jsonl). "
+             "By default these are skipped — they are created automatically by "
+             "Claude Code's Task tool and typically contain only internal "
+             "tool-use traces without user messages.",
+    )
 
     args = parser.parse_args()
+
+    def is_sub_agent_file(path):
+        return path.name.startswith("agent-")
 
     if args.count_only:
         for filepath in args.files:
             jsonl_path = Path(filepath)
             if not jsonl_path.exists() or jsonl_path.suffix != '.jsonl':
+                continue
+            if is_sub_agent_file(jsonl_path) and not args.include_sub_agents:
                 continue
             try:
                 user_c, asst_c = count_messages(jsonl_path)
@@ -505,6 +518,8 @@ def main():
             continue
         if not jsonl_path.suffix == '.jsonl':
             print(f"  SKIP  {filepath} (not a .jsonl file)", file=sys.stderr)
+            continue
+        if is_sub_agent_file(jsonl_path) and not args.include_sub_agents:
             continue
 
         try:
