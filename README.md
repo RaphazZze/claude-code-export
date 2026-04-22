@@ -10,7 +10,8 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 
 - All user and assistant text messages
 - File creations (`+`) and modifications (`~`)
-- Sub-agent dispatches (description, model, and full prompt)
+- Sub-agent dispatches (description and model)
+- Skill invocations (name only — marked as `⚙ Skill: <name>`)
 - MCP tool calls (server, method, and all input parameters)
 - User question prompts and answers
 - Image and file attachment notices
@@ -20,6 +21,7 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 
 - Tool call outputs and results
 - Thinking blocks
+- Sub-agent prompts and skill bodies
 - Internal system tags (`<system-reminder>`, `<local-command-caveat>`, `<ide_opened_file>`)
 - Sidechain messages
 - File history snapshots

@@ -34,6 +34,18 @@ LOCAL_TZ = detect_local_tz()
 
 # ── Helpers ─────────────────────────────────────────────────────────────────
 
+SKILL_PREFIX = "Base directory for this skill: "
+
+
+def skill_name_from_injection(text):
+    """If text is a Claude Code skill injection, return the skill name. Else None."""
+    if not isinstance(text, str) or not text.startswith(SKILL_PREFIX):
+        return None
+    first_line = text.split('\n', 1)[0]
+    path = first_line[len(SKILL_PREFIX):].strip()
+    return Path(path).name or None
+
+
 def clean(text):
     """Remove internal Claude Code tags from user messages."""
     text = re.sub(r'<local-command-caveat>.*?</local-command-caveat>', '', text, flags=re.DOTALL)
@@ -146,6 +158,28 @@ def convert(jsonl_path, user_label, time_format):
             date_str, time_str = parse_timestamp(obj.get('timestamp', ''), time_format)
 
             if role == 'user':
+                # Claude Code skill injections arrive as user messages whose first
+                # text block starts with "Base directory for this skill: <path>".
+                # Replace the full skill body with a one-line marker.
+                if isinstance(content, str):
+                    skill_text = content
+                elif isinstance(content, list):
+                    skill_text = next(
+                        (b.get('text', '') for b in content
+                         if isinstance(b, dict) and b.get('type') == 'text'),
+                        ''
+                    )
+                else:
+                    skill_text = ''
+                skill_name = skill_name_from_injection(skill_text)
+                if skill_name:
+                    messages.append((
+                        'user',
+                        f"> `⚙` Skill: **{skill_name}**",
+                        date_str, time_str
+                    ))
+                    continue
+
                 if isinstance(content, str):
                     text = clean(content)
                     if text:
@@ -205,18 +239,12 @@ def convert(jsonl_path, user_label, time_format):
                                     text_parts.append(f"> `~` Modified `{rel(fp)}`")
                             elif name == 'Agent':
                                 desc = inp.get('description', '')
-                                prompt = inp.get('prompt', '')
                                 model = inp.get('model', '')
                                 header = f"> `▶` Sub-agent"
                                 if desc:
                                     header += f": {desc}"
                                 if model:
                                     header += f" ({model})"
-                                if prompt:
-                                    # Indent the prompt as a nested blockquote
-                                    prompt_lines = prompt.strip().split('\n')
-                                    indented = '\n'.join(f"> > {l}" for l in prompt_lines)
-                                    header += f"\n>\n{indented}"
                                 text_parts.append(header)
                             elif name.startswith('mcp__'):
                                 # MCP tool call — show tool name and inputs
@@ -395,6 +423,9 @@ def count_messages(jsonl_path):
                     text_sig = clean('\n'.join(parts))
                 else:
                     text_sig = ''
+                skill_name = skill_name_from_injection(text_sig)
+                if skill_name:
+                    text_sig = f"> `⚙` Skill: **{skill_name}**"
                 if text_sig:
                     messages.append((role, text_sig))
             elif role == 'assistant':
