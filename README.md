@@ -55,6 +55,12 @@ python3 claudecode_export.py --help
 | `-n`, `--name` | Label for user messages | `User` |
 | `-t`, `--time` | Time format: `12` or `24` | `12` |
 | `-o`, `--output` | Output directory | Current dir |
+| `-c`, `--count-only` | Print message counts without exporting | off |
+| `-a`, `--include-sub-agents` | Include `agent-*.jsonl` sub-agent files | off |
+
+### Sub-agent sessions
+
+Claude Code's Task tool creates sub-agent session files named `agent-*.jsonl` inside `<session-uuid>/subagents/`. These are skipped by default — they typically contain only internal tool-use traces without user messages, and produce empty exports. Pass `--include-sub-agents` / `-a` if you want them (e.g., for debugging or audit).
 
 ### Output filename
 
