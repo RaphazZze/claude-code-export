@@ -520,6 +520,7 @@ def main():
             print(f"  SKIP  {filepath} (not a .jsonl file)", file=sys.stderr)
             continue
         if is_sub_agent_file(jsonl_path) and not args.include_sub_agents:
+            print(f"  SKIP  {jsonl_path.name} (sub-agent session — pass -a to include)", file=sys.stderr)
             continue
 
         try:
