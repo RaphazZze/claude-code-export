@@ -32,6 +32,16 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 - **Relative paths** with file extensions are wrapped in backticks for readability
 - A sanitization note is included at the top of every export
 
+## Install as a Claude Code skill
+
+This repo ships with a [SKILL.md](SKILL.md) so you can invoke it from inside Claude Code as `/export-session`. Symlink the repo into your skills directory:
+
+```bash
+ln -s "$(pwd)" ~/.claude/skills/export-session
+```
+
+Then run `/export-session` from any Claude Code session.
+
 ## Usage
 
 ```bash

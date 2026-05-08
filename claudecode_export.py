@@ -139,6 +139,7 @@ def convert(jsonl_path, user_label, time_format):
     # Second pass: extract messages
     messages = []
     pending_questions = {}
+    skip_next_user = False
 
     with open(jsonl_path, encoding='utf-8', errors='replace') as f:
         for line in f:
@@ -158,6 +159,10 @@ def convert(jsonl_path, user_label, time_format):
             date_str, time_str = parse_timestamp(obj.get('timestamp', ''), time_format)
 
             if role == 'user':
+                if skip_next_user:
+                    skip_next_user = False
+                    continue
+
                 # Claude Code skill injections arrive as user messages whose first
                 # text block starts with "Base directory for this skill: <path>".
                 # Replace the full skill body with a one-line marker.
@@ -178,6 +183,20 @@ def convert(jsonl_path, user_label, time_format):
                         f"> `⚙` Skill: **{skill_name}**",
                         date_str, time_str
                     ))
+                    continue
+
+                # Slash command invocation: a user message containing
+                # <command-name>/foo</command-name>. Claude Code injects the
+                # command body as the *next* user message — render a marker
+                # and drop that body.
+                cmd_match = re.search(r'<command-name>/?([^<\s]+)</command-name>', skill_text)
+                if cmd_match:
+                    messages.append((
+                        'user',
+                        f"> `⚙` Skill: **{cmd_match.group(1)}**",
+                        date_str, time_str
+                    ))
+                    skip_next_user = True
                     continue
 
                 if isinstance(content, str):
@@ -205,11 +224,14 @@ def convert(jsonl_path, user_label, time_format):
                             if tid and tid in pending_questions:
                                 raw = block.get('content', '')
                                 if isinstance(raw, str):
-                                    matches = re.findall(r'"([^"]+)"="([^"]+)"', raw)
-                                    answered = {q: a for q, a in matches}
                                     for qinfo in pending_questions[tid]:
-                                        answer = answered.get(qinfo['question'], raw.strip())
-                                        text_parts.append(f"_{qinfo['question']}_\n→ **{answer}**")
+                                        q = qinfo['question']
+                                        # Search for the literal "<question>"="<answer>" pattern.
+                                        # Done per-question because the question text itself may
+                                        # contain quote chars that confuse a generic regex.
+                                        m = re.search(re.escape(f'"{q}"="') + r'([^"]*)"', raw)
+                                        answer = m.group(1) if m else raw.strip()
+                                        text_parts.append(f"_{q}_\n→ **{answer}**")
                                 del pending_questions[tid]
                     if text_parts:
                         messages.append(('user', '\n\n'.join(text_parts), date_str, time_str))
@@ -402,6 +424,7 @@ def convert(jsonl_path, user_label, time_format):
 def count_messages(jsonl_path):
     """Quick message count without full conversion — skips Markdown generation."""
     messages = []
+    skip_next_user = False
     with open(jsonl_path, encoding='utf-8', errors='replace') as f:
         for line in f:
             try:
@@ -416,6 +439,9 @@ def count_messages(jsonl_path):
             role = msg.get('role')
             content = msg.get('content', '')
             if role == 'user':
+                if skip_next_user:
+                    skip_next_user = False
+                    continue
                 if isinstance(content, str):
                     text_sig = clean(content)
                 elif isinstance(content, list):
@@ -426,6 +452,11 @@ def count_messages(jsonl_path):
                 skill_name = skill_name_from_injection(text_sig)
                 if skill_name:
                     text_sig = f"> `⚙` Skill: **{skill_name}**"
+                else:
+                    cmd_match = re.search(r'<command-name>/?([^<\s]+)</command-name>', text_sig)
+                    if cmd_match:
+                        text_sig = f"> `⚙` Skill: **{cmd_match.group(1)}**"
+                        skip_next_user = True
                 if text_sig:
                     messages.append((role, text_sig))
             elif role == 'assistant':
@@ -462,9 +493,9 @@ def main():
     parser = argparse.ArgumentParser(
         description="Convert Claude Code .jsonl sessions to Markdown.",
         epilog="Examples:\n"
-               "  python3 export_conversation.py session.jsonl\n"
-               "  python3 export_conversation.py *.jsonl -o exports/ --name Boris\n"
-               "  python3 export_conversation.py *.jsonl --time 24\n",
+               "  python3 claudecode_export.py session.jsonl\n"
+               "  python3 claudecode_export.py *.jsonl -o exports/ --name Boris\n"
+               "  python3 claudecode_export.py *.jsonl --time 24\n",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("files", nargs="+", help=".jsonl file(s) to convert")
