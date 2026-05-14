@@ -54,6 +54,9 @@ python3 claudecode_export.py <file.jsonl> --name Boris --time 24
 # Batch export to a specific directory
 python3 claudecode_export.py *.jsonl -o exports/ --name Boris
 
+# Custom assistant label (e.g. for a named agent)
+python3 claudecode_export.py *.jsonl --name Raph --assistant-name KAIZEN
+
 # Full help
 python3 claudecode_export.py --help
 ```
@@ -63,6 +66,7 @@ python3 claudecode_export.py --help
 | Flag | Description | Default |
 |------|-------------|---------|
 | `-n`, `--name` | Label for user messages | `User` |
+| `-A`, `--assistant-name` | Label for assistant messages | `Claude` |
 | `-t`, `--time` | Time format: `12` or `24` | `12` |
 | `-o`, `--output` | Output directory | Current dir |
 | `-c`, `--count-only` | Print message counts without exporting | off |

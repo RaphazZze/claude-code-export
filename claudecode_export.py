@@ -104,7 +104,7 @@ def parse_timestamp(ts_raw, time_format):
 
 # ── Core conversion ────────────────────────────────────────────────────────
 
-def convert(jsonl_path, user_label, time_format):
+def convert(jsonl_path, user_label, assistant_label, time_format):
     """Parse a .jsonl session file and return (markdown_string, message_count, start_datetime)."""
 
     # First pass: find project root and first timestamp from first non-snapshot record
@@ -335,7 +335,7 @@ def convert(jsonl_path, user_label, time_format):
             lines.append(f"### [{dt.strftime('%B %-d, %Y')}]")
             lines.append("")
             current_date = date_str
-        label = f"### ❯ {user_label}" if role == "user" else "### ❯ Claude"
+        label = f"### ❯ {user_label}" if role == "user" else f"### ❯ {assistant_label}"
         ts_str = f" · {time_str}" if time_str else ""
         lines.append(f"{label}{ts_str}")
         lines.append("")
@@ -495,12 +495,14 @@ def main():
         epilog="Examples:\n"
                "  python3 claudecode_export.py session.jsonl\n"
                "  python3 claudecode_export.py *.jsonl -o exports/ --name Boris\n"
+               "  python3 claudecode_export.py *.jsonl --name Raph --assistant-name KAIZEN\n"
                "  python3 claudecode_export.py *.jsonl --time 24\n",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("files", nargs="+", help=".jsonl file(s) to convert")
     parser.add_argument("-o", "--output", default=".", help="output directory (default: current dir)")
     parser.add_argument("-n", "--name", default="User", help="label for user messages (default: User)")
+    parser.add_argument("-A", "--assistant-name", default="Claude", help="label for assistant messages (default: Claude)")
     parser.add_argument("-t", "--time", choices=["12", "24"], default="12", help="time format (default: 12)")
     parser.add_argument("-c", "--count-only", action="store_true", help="print message counts without exporting")
     parser.add_argument(
@@ -526,7 +528,7 @@ def main():
                 continue
             try:
                 user_c, asst_c = count_messages(jsonl_path)
-                print(f"{jsonl_path.name}\t{user_c + asst_c}\t({user_c} user, {asst_c} Claude)")
+                print(f"{jsonl_path.name}\t{user_c + asst_c}\t({user_c} user, {asst_c} {args.assistant_name})")
             except Exception as e:
                 print(f"{jsonl_path.name}\tERROR: {e}", file=sys.stderr)
         return
@@ -555,7 +557,7 @@ def main():
             continue
 
         try:
-            md, (user_c, asst_c), start_dt = convert(jsonl_path, args.name, args.time)
+            md, (user_c, asst_c), start_dt = convert(jsonl_path, args.name, args.assistant_name, args.time)
             short_id = jsonl_path.stem[:5]
             if start_dt:
                 stamp = start_dt.strftime('%Y-%m-%d_%H%M')
@@ -564,7 +566,7 @@ def main():
             out_path = out_dir / f"session_export_{stamp}_{short_id}.md"
             with open(out_path, 'w', encoding='utf-8') as f:
                 f.write(md)
-            print(f"  OK    {jsonl_path.name} → {out_path.name}  ({user_c + asst_c} messages: {user_c} user, {asst_c} Claude)")
+            print(f"  OK    {jsonl_path.name} → {out_path.name}  ({user_c + asst_c} messages: {user_c} user, {asst_c} {args.assistant_name})")
             total_files += 1
         except Exception as e:
             print(f"  FAIL  {jsonl_path.name}: {e}", file=sys.stderr)
