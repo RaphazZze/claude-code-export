@@ -9,9 +9,14 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 ### What's kept
 
 - All user and assistant text messages
+- Queued messages — text typed while Claude is mid-turn, which the harness
+  stores as an attachment rather than a user message
 - File creations (`+`) and modifications (`~`)
 - Sub-agent dispatches (description and model)
-- Skill invocations (name only — marked as `⚙ Skill: <name>`)
+- Skill invocations (name only — marked as `⚙ Skill: <name>`, attributed to
+  the assistant, since the assistant is what invokes a skill)
+- Slash commands typed by the user (marked as `⌘ Command: /<name>`)
+- Background task completions (marked as `⚑ Task notification: <summary>`)
 - MCP tool calls (server, method, and all input parameters)
 - User question prompts and answers
 - Image and file attachment notices
@@ -22,6 +27,9 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 - Tool call outputs and results
 - Thinking blocks
 - Sub-agent prompts and skill bodies
+- Background task result payloads (the summary line is kept)
+- Harness-injected messages that arrive with the `user` role — plugin skill
+  bodies, workflow resume prompts, image-resize notices
 - Internal system tags (`<system-reminder>`, `<local-command-caveat>`, `<ide_opened_file>`)
 - Sidechain messages
 - File history snapshots
@@ -29,7 +37,9 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 ### Sanitization
 
 - **Absolute paths** are converted to relative paths (project root, `~/.claude/`, `~/`)
-- **Relative paths** with file extensions are wrapped in backticks for readability
+- **Relative paths** with file extensions are wrapped in backticks for readability.
+  Fenced code blocks, inline code spans, markdown links and images, and bare URLs
+  are left untouched, so an existing `[label](path/file.md)` link stays intact
 - A sanitization note is included at the top of every export
 
 ## Install as a Claude Code skill
