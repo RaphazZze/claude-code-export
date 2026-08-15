@@ -54,6 +54,80 @@ def clean(text):
     return text.strip()
 
 
+def task_notification_marker(text):
+    """One-line marker for a background-task completion ping, or None.
+
+    These arrive as user-role records but are harness events, not the user —
+    and they carry the task's entire result payload, which can run to tens of
+    thousands of characters.
+    """
+    m = re.search(r'<task-notification>(.*?)</task-notification>', text or '', re.DOTALL)
+    if not m:
+        return None
+    body = m.group(1)
+    summary = re.search(r'<summary>(.*?)</summary>', body, re.DOTALL)
+    status = re.search(r'<status>(.*?)</status>', body, re.DOTALL)
+    label = ' '.join(summary.group(1).split()) if summary else 'Background task'
+    marker = f"> `⚑` Task notification: {label}"
+    if status:
+        marker += f" ({status.group(1).strip()})"
+    return marker
+
+
+def render_user_blocks(blocks, pending_questions=None):
+    """Render user-side content blocks (text/image/document/answered question)."""
+    parts = []
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        btype = block.get('type')
+        if btype == 'text':
+            t = clean(block.get('text', ''))
+            if t:
+                parts.append(t)
+        elif btype == 'image':
+            media = block.get('source', {}).get('media_type', 'image')
+            parts.append(f"_[Image attached: {media}]_")
+        elif btype == 'document':
+            title = block.get('title') or block.get('source', {}).get('filename') or 'document'
+            parts.append(f"_[File attached: {title}]_")
+        elif btype == 'tool_result' and pending_questions:
+            tid = block.get('tool_use_id')
+            if tid and tid in pending_questions:
+                raw = block.get('content', '')
+                if isinstance(raw, str):
+                    for qinfo in pending_questions[tid]:
+                        q = qinfo['question']
+                        # Search for the literal "<question>"="<answer>" pattern.
+                        # Done per-question because the question text itself may
+                        # contain quote chars that confuse a generic regex.
+                        m = re.search(re.escape(f'"{q}"="') + r'([^"]*)"', raw)
+                        answer = m.group(1) if m else raw.strip()
+                        parts.append(f"_{q}_\n→ **{answer}**")
+                del pending_questions[tid]
+    return parts
+
+
+def queued_prompt_parts(attachment):
+    """Render a queued_command attachment's prompt, or [] if it isn't a user turn.
+
+    Messages typed while Claude is mid-turn are stored as `queued_command`
+    attachments with no `message` key, so they never reach the role dispatch.
+    commandMode 'task-notification' is a background-agent ping from the
+    harness, not the user — origin.kind is unreliable here (genuine user
+    messages sometimes carry origin: null).
+    """
+    if attachment.get('commandMode') != 'prompt':
+        return []
+    prompt = attachment.get('prompt', '')
+    if isinstance(prompt, str):
+        t = clean(prompt)
+        return [t] if t else []
+    if isinstance(prompt, list):
+        return render_user_blocks(prompt)
+    return []
+
+
 def fix_table_spacing(text):
     """Ensure a blank line before markdown table rows that follow non-table lines."""
     lines = text.split('\n')
@@ -153,6 +227,17 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
             if obj.get('isSidechain'):
                 continue
 
+            # Queued user messages have no `message` key — handle before the
+            # role dispatch. File order already places them correctly.
+            att = obj.get('attachment') or {}
+            if obj.get('type') == 'attachment' and att.get('type') == 'queued_command':
+                parts = queued_prompt_parts(att)
+                if parts:
+                    date_str, time_str = parse_timestamp(
+                        obj.get('timestamp') or att.get('timestamp', ''), time_format)
+                    messages.append(('user', '\n\n'.join(parts), date_str, time_str))
+                continue
+
             msg = obj.get('message', {})
             role = msg.get('role')
             content = msg.get('content', '')
@@ -165,7 +250,8 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
 
                 # Claude Code skill injections arrive as user messages whose first
                 # text block starts with "Base directory for this skill: <path>".
-                # Replace the full skill body with a one-line marker.
+                # The invocation itself is the assistant's `Skill` tool call and
+                # is rendered from that side — drop the injected body here.
                 if isinstance(content, str):
                     skill_text = content
                 elif isinstance(content, list):
@@ -176,27 +262,38 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
                     )
                 else:
                     skill_text = ''
-                skill_name = skill_name_from_injection(skill_text)
-                if skill_name:
-                    messages.append((
-                        'user',
-                        f"> `⚙` Skill: **{skill_name}**",
-                        date_str, time_str
-                    ))
+                if skill_name_from_injection(skill_text):
                     continue
 
-                # Slash command invocation: a user message containing
+                # Slash command typed by the user: a user message containing
                 # <command-name>/foo</command-name>. Claude Code injects the
-                # command body as the *next* user message — render a marker
+                # command output as the *next* user message — render a marker
                 # and drop that body.
                 cmd_match = re.search(r'<command-name>/?([^<\s]+)</command-name>', skill_text)
                 if cmd_match:
                     messages.append((
                         'user',
-                        f"> `⚙` Skill: **{cmd_match.group(1)}**",
+                        f"> `⌘` Command: **/{cmd_match.group(1)}**",
                         date_str, time_str
                     ))
                     skip_next_user = True
+                    continue
+
+                # Background-task completion pings arrive as user records but
+                # come from the harness. Keep a one-line marker on the assistant
+                # side — that's who receives and reacts to them — and drop the
+                # raw result payload.
+                if ((obj.get('origin') or {}).get('kind') == 'task-notification'
+                        or '<task-notification>' in skill_text):
+                    note = task_notification_marker(skill_text)
+                    if note:
+                        messages.append(('assistant', note, date_str, time_str))
+                    continue
+
+                # Anything else flagged isMeta is a harness injection — plugin
+                # skill bodies, workflow resume prompts, image-resize notices.
+                # Not the user speaking.
+                if obj.get('isMeta'):
                     continue
 
                 if isinstance(content, str):
@@ -204,35 +301,7 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
                     if text:
                         messages.append(('user', text, date_str, time_str))
                 elif isinstance(content, list):
-                    text_parts = []
-                    for block in content:
-                        if not isinstance(block, dict):
-                            continue
-                        btype = block.get('type')
-                        if btype == 'text':
-                            t = clean(block.get('text', ''))
-                            if t:
-                                text_parts.append(t)
-                        elif btype == 'image':
-                            media = block.get('source', {}).get('media_type', 'image')
-                            text_parts.append(f"_[Image attached: {media}]_")
-                        elif btype == 'document':
-                            title = block.get('title') or block.get('source', {}).get('filename') or 'document'
-                            text_parts.append(f"_[File attached: {title}]_")
-                        elif btype == 'tool_result':
-                            tid = block.get('tool_use_id')
-                            if tid and tid in pending_questions:
-                                raw = block.get('content', '')
-                                if isinstance(raw, str):
-                                    for qinfo in pending_questions[tid]:
-                                        q = qinfo['question']
-                                        # Search for the literal "<question>"="<answer>" pattern.
-                                        # Done per-question because the question text itself may
-                                        # contain quote chars that confuse a generic regex.
-                                        m = re.search(re.escape(f'"{q}"="') + r'([^"]*)"', raw)
-                                        answer = m.group(1) if m else raw.strip()
-                                        text_parts.append(f"_{q}_\n→ **{answer}**")
-                                del pending_questions[tid]
+                    text_parts = render_user_blocks(content, pending_questions)
                     if text_parts:
                         messages.append(('user', '\n\n'.join(text_parts), date_str, time_str))
 
@@ -268,6 +337,14 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
                                 if model:
                                     header += f" ({model})"
                                 text_parts.append(header)
+                            elif name == 'Skill':
+                                sk = inp.get('skill', '')
+                                if sk:
+                                    marker = f"> `⚙` Skill: **{sk}**"
+                                    skill_args = inp.get('args')
+                                    if skill_args:
+                                        marker += f" — `{skill_args}`"
+                                    text_parts.append(marker)
                             elif name.startswith('mcp__'):
                                 # MCP tool call — show tool name and inputs
                                 # mcp__glean_default__chat → Glean: chat
@@ -435,6 +512,12 @@ def count_messages(jsonl_path):
                 continue
             if obj.get('isSidechain'):
                 continue
+            att = obj.get('attachment') or {}
+            if obj.get('type') == 'attachment' and att.get('type') == 'queued_command':
+                parts = queued_prompt_parts(att)
+                if parts:
+                    messages.append(('user', '\n\n'.join(parts)))
+                continue
             msg = obj.get('message', {})
             role = msg.get('role')
             content = msg.get('content', '')
@@ -449,14 +532,20 @@ def count_messages(jsonl_path):
                     text_sig = clean('\n'.join(parts))
                 else:
                     text_sig = ''
-                skill_name = skill_name_from_injection(text_sig)
-                if skill_name:
-                    text_sig = f"> `⚙` Skill: **{skill_name}**"
-                else:
-                    cmd_match = re.search(r'<command-name>/?([^<\s]+)</command-name>', text_sig)
-                    if cmd_match:
-                        text_sig = f"> `⚙` Skill: **{cmd_match.group(1)}**"
-                        skip_next_user = True
+                if skill_name_from_injection(text_sig):
+                    continue
+                cmd_match = re.search(r'<command-name>/?([^<\s]+)</command-name>', text_sig)
+                if cmd_match:
+                    text_sig = f"> `⌘` Command: **/{cmd_match.group(1)}**"
+                    skip_next_user = True
+                elif ((obj.get('origin') or {}).get('kind') == 'task-notification'
+                        or '<task-notification>' in text_sig):
+                    note = task_notification_marker(text_sig)
+                    if note:
+                        messages.append(('assistant', note))
+                    continue
+                elif obj.get('isMeta'):
+                    continue
                 if text_sig:
                     messages.append((role, text_sig))
             elif role == 'assistant':
@@ -464,7 +553,10 @@ def count_messages(jsonl_path):
                     has_visible = any(
                         isinstance(b, dict) and (
                             b.get('type') == 'text' or
-                            (b.get('type') == 'tool_use' and b.get('name', '') in ('Write', 'Edit', 'Agent', 'AskUserQuestion') or b.get('name', '').startswith('mcp__'))
+                            (b.get('type') == 'tool_use' and (
+                                b.get('name', '') in ('Write', 'Edit', 'Agent', 'Skill', 'AskUserQuestion')
+                                or b.get('name', '').startswith('mcp__')
+                            ))
                         )
                         for b in content
                     )
