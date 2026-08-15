@@ -139,6 +139,36 @@ def fix_table_spacing(text):
     return '\n'.join(result)
 
 
+# Spans where a path must be left byte-for-byte alone. Backticking inside a
+# link's parentheses breaks the link; inside a code span it doubles up. Order
+# matters — fenced blocks are consumed whole before inline spans can mis-pair
+# on backticks appearing inside them.
+PROTECTED_RE = re.compile(
+    r'```[\s\S]*?```'                  # fenced code block
+    r'|`[^`\n]*`'                      # inline code span
+    r'|!?\[[^\]\n]*\]\([^)\n]*\)'      # markdown link / image
+    r'|<?\bhttps?://[^\s<>)\]]+>?'     # bare URL
+)
+
+
+def sub_outside_protected(pattern, repl, text):
+    """re.sub, applied only outside code spans/blocks and markdown links.
+
+    Path *sanitization* still has to run everywhere — inside code blocks and
+    link targets included — so only the cosmetic backticking routes through
+    here. Keeping the two separate is what stops the scrubber from mangling
+    `[label](path/file.md)` into `[label](`path/file.md`)`.
+    """
+    out = []
+    pos = 0
+    for m in PROTECTED_RE.finditer(text):
+        out.append(re.sub(pattern, repl, text[pos:m.start()]))
+        out.append(m.group(0))
+        pos = m.end()
+    out.append(re.sub(pattern, repl, text[pos:]))
+    return ''.join(out)
+
+
 def make_rel(project_root):
     """Return a closure that converts absolute paths to relative ones."""
     home_claude = Path.home() / '.claude'
@@ -431,7 +461,7 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
     # 1. Absolute paths rooted at project dir → backticked relative paths
     if project_root:
         root_esc = re.escape(str(project_root) + '/')
-        output = re.sub(
+        output = sub_outside_protected(
             r'(?<!`)' + root_esc + r'(' + PTAIL + r')(?!`)',
             r'`\1`', output
         )
@@ -442,7 +472,7 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
     # 2. Paths under ~/.claude → backticked ~/...
     home_claude = str(Path.home() / '.claude')
     hc_esc = re.escape(home_claude + '/')
-    output = re.sub(
+    output = sub_outside_protected(
         r'(?<!`)' + hc_esc + r'(' + PTAIL + r')(?!`)',
         r'`~/.claude/\1`', output
     )
@@ -452,7 +482,7 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
     # 3. Paths under home dir → backticked ~/...
     home_dir = str(Path.home())
     hd_esc = re.escape(home_dir + '/')
-    output = re.sub(
+    output = sub_outside_protected(
         r'(?<!`)' + hd_esc + r'(' + PTAIL + r')(?!`)',
         r'`~/\1`', output
     )
@@ -490,8 +520,14 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
         output,
     )
 
-    # 4. Remaining bare relative paths (no spaces — common case)
-    output = re.sub(r'(?<!`)(\b[\w.~-]+/[\w./_-]+\.\w+)(?!`)', r'`\1`', output)
+    # 4. Remaining bare paths (no spaces — common case). The lookbehind excludes
+    #    "/" so a match can't start mid-path: that both keeps a leading slash
+    #    inside the backticks (not stranded as /`private/tmp/x.log`) and stops
+    #    the host part of a bare URL from being backticked mid-string.
+    #    "." is excluded too, so a schemeless host ("example.com/a/b.html") isn't
+    #    chopped mid-domain the way "/" alone would allow.
+    output = sub_outside_protected(
+        r'(?<![\w`/.])(/?[\w.~-]+/[\w./_-]+\.\w+)(?!`)', r'`\1`', output)
 
     user_count = sum(1 for r, _, _, _ in deduped if r == 'user')
     assistant_count = sum(1 for r, _, _, _ in deduped if r == 'assistant')
