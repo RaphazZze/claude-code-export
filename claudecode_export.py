@@ -383,10 +383,22 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
                                 method = parts[-1] if len(parts) > 2 else name
                                 label = server.replace('_default', '').replace('_', ' ').title()
                                 header = f"> `⚡` {label}: {method}"
-                                # Show all input params as nested blockquote
+                                # Show all input params as nested blockquote. Every
+                                # line of a multi-line value needs the prefix too —
+                                # otherwise the quote ends at the first newline and
+                                # the remainder (an email body, a document) spills
+                                # into the page as unquoted markup.
                                 param_lines = []
                                 for k, v in inp.items():
-                                    param_lines.append(f"> > **{k}:** {v}")
+                                    v_str = str(v)
+                                    if '\n' in v_str:
+                                        quoted = '\n'.join(
+                                            f"> > {ln}" if ln.strip() else "> >"
+                                            for ln in v_str.split('\n')
+                                        )
+                                        param_lines.append(f"> > **{k}:**\n{quoted}")
+                                    else:
+                                        param_lines.append(f"> > **{k}:** {v_str}")
                                 if param_lines:
                                     header += "\n" + '\n'.join(param_lines)
                                 text_parts.append(header)
