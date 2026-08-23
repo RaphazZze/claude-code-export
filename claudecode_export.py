@@ -139,6 +139,19 @@ def fix_table_spacing(text):
     return '\n'.join(result)
 
 
+# A tool marker: a blockquote line opening with a glyph in backticks —
+# "> `$` Rebuild the venv", "> `~` Modified `memory/file.md`".
+MARKER_RE = re.compile(r'^> `[^`]+`')
+
+
+def is_marker_only(text):
+    """True if a message is nothing but tool markers — no prose of its own."""
+    lines = [ln for ln in text.split('\n') if ln.strip()]
+    return bool(lines) and bool(MARKER_RE.match(lines[0])) and all(
+        ln.startswith('>') for ln in lines
+    )
+
+
 # Spans where a path must be left byte-for-byte alone. Backticking inside a
 # link's parentheses breaks the link; inside a code span it doubles up. Order
 # matters — fenced blocks are consumed whole before inline spans can mis-pair
@@ -358,6 +371,15 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
                                 fp = inp.get('file_path', '')
                                 if fp:
                                     text_parts.append(f"> `~` Modified `{rel(fp)}`")
+                            elif name == 'Bash':
+                                # Only the one-line description — never the
+                                # command itself. The command is mechanics; the
+                                # description is the narrative beat. No
+                                # description means no narrative, so show
+                                # nothing rather than a bare marker.
+                                desc = (inp.get('description') or '').strip()
+                                if desc:
+                                    text_parts.append(f"> `$` {desc}")
                             elif name == 'Agent':
                                 desc = inp.get('description', '')
                                 model = inp.get('model', '')
@@ -433,6 +455,20 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
         if key != prev:
             deduped.append(m)
             prev = key
+
+    # Collapse consecutive tool markers from the same speaker into one block.
+    # The harness writes every tool call as its own assistant record, so a batch
+    # of parallel calls would otherwise get a timestamped header each — mostly
+    # scaffolding around one line of narrative.
+    merged = []
+    for role, text, date_str, time_str in deduped:
+        if (merged and merged[-1][0] == role and merged[-1][2] == date_str
+                and is_marker_only(merged[-1][1]) and is_marker_only(text)):
+            p_role, p_text, p_date, p_time = merged[-1]
+            merged[-1] = (p_role, p_text + '\n>\n' + text, p_date, p_time)
+        else:
+            merged.append((role, text, date_str, time_str))
+    deduped = merged
 
     # Build Markdown
     lines = []

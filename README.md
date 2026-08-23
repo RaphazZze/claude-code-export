@@ -12,6 +12,7 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 - Queued messages — text typed while Claude is mid-turn, which the harness
   stores as an attachment rather than a user message
 - File creations (`+`) and modifications (`~`)
+- Shell commands (`$`) — the one-line description only, never the command
 - Sub-agent dispatches (description and model)
 - Skill invocations (name only — marked as `⚙ Skill: <name>`, attributed to
   the assistant, since the assistant is what invokes a skill)
@@ -25,6 +26,7 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 ### What's stripped
 
 - Tool call outputs and results
+- Shell command bodies (only the description survives)
 - Thinking blocks
 - Sub-agent prompts and skill bodies
 - Background task result payloads (the summary line is kept)
