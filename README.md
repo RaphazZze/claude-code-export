@@ -13,7 +13,7 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
   stores as an attachment rather than a user message
 - File creations (`+`) and modifications (`~`)
 - Shell commands (`$`) — the one-line description only, never the command
-- Sub-agent dispatches (description and model)
+- Sub-agent dispatches (description, agent type and model)
 - Skill invocations (name only — marked as `⚙ Skill: <name>`, attributed to
   the assistant, since the assistant is what invokes a skill)
 - Slash commands typed by the user (marked as `⌘ Command: /<name>`)

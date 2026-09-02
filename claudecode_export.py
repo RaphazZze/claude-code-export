@@ -383,11 +383,17 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
                             elif name == 'Agent':
                                 desc = inp.get('description', '')
                                 model = inp.get('model', '')
-                                header = f"> `▶` Sub-agent"
+                                atype = inp.get('subagent_type', '')
+                                header = "> `▶` Sub-agent"
                                 if desc:
                                     header += f": {desc}"
-                                if model:
-                                    header += f" ({model})"
+                                # Both describe what kind of agent ran, so they
+                                # share one parenthetical. Either can be absent
+                                # — the tool defaults them — and an absent one
+                                # is left out rather than guessed at.
+                                tags = [t for t in (atype, model) if t]
+                                if tags:
+                                    header += f" ({' · '.join(tags)})"
                                 text_parts.append(header)
                             elif name == 'Skill':
                                 sk = inp.get('skill', '')
