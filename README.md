@@ -96,6 +96,24 @@ Files are named `session_export_<date>_<time>_<id>.md` where:
 
 Example: `session_export_2026-03-24_1807_ffaab.md`
 
+## Tests
+
+```bash
+python3 tests/test_export.py            # run
+python3 tests/test_export.py --update   # regenerate the expected export
+```
+
+`tests/kitchen_sink.jsonl` holds one record of every class this tool has ever
+mishandled, and `tests/kitchen_sink.expected.md` is the Markdown it should
+produce. The test diffs the two, checks that `--count-only` agrees with the
+export, and asserts that none of the content the fixture deliberately carries
+— command bodies, injected skill bodies, task payloads, sidechain messages,
+absolute home paths — reaches the output.
+
+The timezone is pinned and `Path.home()` is patched, so the expected export is
+byte-identical on any machine. `--update` rewrites it; since it is checked in,
+that lands as a reviewable diff rather than a silent pass.
+
 ## Where are the .jsonl files?
 
 Claude Code stores sessions per project at:

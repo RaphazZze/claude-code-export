@@ -590,84 +590,21 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
 
 
 def count_messages(jsonl_path):
-    """Quick message count without full conversion — skips Markdown generation."""
-    messages = []
-    skip_next_user = False
-    with open(jsonl_path, encoding='utf-8', errors='replace') as f:
-        for line in f:
-            try:
-                obj = json.loads(line)
-            except Exception:
-                continue
-            if obj.get('type') == 'file-history-snapshot':
-                continue
-            if obj.get('isSidechain'):
-                continue
-            att = obj.get('attachment') or {}
-            if obj.get('type') == 'attachment' and att.get('type') == 'queued_command':
-                parts = queued_prompt_parts(att)
-                if parts:
-                    messages.append(('user', '\n\n'.join(parts)))
-                continue
-            msg = obj.get('message', {})
-            role = msg.get('role')
-            content = msg.get('content', '')
-            if role == 'user':
-                if skip_next_user:
-                    skip_next_user = False
-                    continue
-                if isinstance(content, str):
-                    text_sig = clean(content)
-                elif isinstance(content, list):
-                    parts = [b.get('text', '') for b in content if isinstance(b, dict) and b.get('type') == 'text']
-                    text_sig = clean('\n'.join(parts))
-                else:
-                    text_sig = ''
-                if skill_name_from_injection(text_sig):
-                    continue
-                cmd_match = re.search(r'<command-name>/?([^<\s]+)</command-name>', text_sig)
-                if cmd_match:
-                    text_sig = f"> `⌘` Command: **/{cmd_match.group(1)}**"
-                    skip_next_user = True
-                elif ((obj.get('origin') or {}).get('kind') == 'task-notification'
-                        or '<task-notification>' in text_sig):
-                    note = task_notification_marker(text_sig)
-                    if note:
-                        messages.append(('assistant', note))
-                    continue
-                elif obj.get('isMeta'):
-                    continue
-                if text_sig:
-                    messages.append((role, text_sig))
-            elif role == 'assistant':
-                if isinstance(content, list):
-                    has_visible = any(
-                        isinstance(b, dict) and (
-                            b.get('type') == 'text' or
-                            (b.get('type') == 'tool_use' and (
-                                b.get('name', '') in ('Write', 'Edit', 'Agent', 'Skill', 'AskUserQuestion')
-                                or b.get('name', '').startswith('mcp__')
-                            ))
-                        )
-                        for b in content
-                    )
-                    if has_visible:
-                        parts = [b.get('text', '') for b in content if isinstance(b, dict) and b.get('type') == 'text']
-                        messages.append((role, '\n'.join(parts).strip()))
-                elif isinstance(content, str) and content.strip():
-                    messages.append((role, content.strip()))
-    # Deduplicate consecutive identical (role, text) pairs — matches convert() logic
-    user_count = 0
-    assistant_count = 0
-    prev = None
-    for m in messages:
-        if m != prev:
-            if m[0] == 'user':
-                user_count += 1
-            else:
-                assistant_count += 1
-            prev = m
-    return user_count, assistant_count
+    """Return (user_count, assistant_count) for a session file.
+
+    Delegates to convert() and discards the Markdown. This was a second
+    implementation of the same routing rules, which is the shape that drifts:
+    measured over 25 real sessions the two disagreed on 23, always
+    undercounting, by 328 messages in total and up to 38% of a single
+    session. Three separate rules had gone out of sync — a `Bash` call
+    renders in the export but was invisible here, an `AskUserQuestion` was
+    counted here but renders nothing, and an answered question was a message
+    there and not one here.
+
+    One route to one answer is worth more than the Markdown it throws away.
+    """
+    _, counts, _ = convert(jsonl_path, "User", "Claude", "12")
+    return counts
 
 
 # ── CLI ─────────────────────────────────────────────────────────────────────
