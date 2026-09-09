@@ -33,12 +33,10 @@ ever mishandled, so the diff below is the guard on all of them at once:
 checked in, so a regenerated one lands as a reviewable diff — read that diff
 and decide whether the change is the fix or the defect.
 
-One line of the expected export records a defect rather than correct output,
-deliberately: a cloud-storage path renders as ``<Obsidian>`/Notes/index.md```,
-with the placeholder stranded outside the backticks, because the bare-path
-rule's lookbehind does not exclude `>`. It is frozen here because this file's
-job is to record what the exporter does today. Fix the rule and this line
-changes — that is the fix landing, not a regression.
+A normalised cloud-storage path and its placeholder are expected to render as
+one code span — `` `<Obsidian>/Notes/index.md` ``, never with the placeholder
+stranded outside it. That was a real defect until 2026-09-09: the bare-path
+rule matched from the slash, so the code span opened mid-path.
 
 Determinism: the timezone is pinned to UTC and `Path.home()` is patched, so
 the expected export is byte-identical on any machine. The one line that

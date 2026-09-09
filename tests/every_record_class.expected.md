@@ -118,7 +118,7 @@ cat build/out.txt
 
 ### ❯ Claude · 2:39 PM
 
-Synced to <Obsidian>`/Notes/index.md` and <Google Drive>`/reports/q3.xlsx` already.
+Synced to `<Obsidian>/Notes/index.md` and `<Google Drive>/reports/q3.xlsx` already.
 
 ---
 

@@ -42,6 +42,11 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 - **Relative paths** with file extensions are wrapped in backticks for readability.
   Fenced code blocks, inline code spans, markdown links and images, and bare URLs
   are left untouched, so an existing `[label](path/file.md)` link stays intact
+- **Cloud-storage paths** are reduced to a provider placeholder so they reveal
+  nothing about the machine's setup — iCloud app containers become
+  `<Appname>/`, Google Drive, OneDrive and Dropbox mounts become
+  `<Google Drive>/` and so on. The placeholder and its path are wrapped as one
+  span: `` `<Obsidian>/Notes/index.md` ``
 - A sanitization note is included at the top of every export
 
 ## Install as a Claude Code skill

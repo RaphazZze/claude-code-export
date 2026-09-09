@@ -581,8 +581,12 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
     #    the host part of a bare URL from being backticked mid-string.
     #    "." is excluded too, so a schemeless host ("example.com/a/b.html") isn't
     #    chopped mid-domain the way "/" alone would allow.
+    #    The optional <...> prefix keeps a placeholder from step 3b attached to
+    #    its path. Without it the match began at the slash and produced
+    #    <Obsidian>`/Notes/index.md` — the placeholder stranded outside the code
+    #    span, which opened mid-path.
     output = sub_outside_protected(
-        r'(?<![\w`/.])(/?[\w.~-]+/[\w./_-]+\.\w+)(?!`)', r'`\1`', output)
+        r'(?<![\w`/.])((?:<[^<>\n]+>)?/?[\w.~-]+/[\w./_-]+\.\w+)(?!`)', r'`\1`', output)
 
     user_count = sum(1 for r, _, _, _ in deduped if r == 'user')
     assistant_count = sum(1 for r, _, _, _ in deduped if r == 'assistant')
