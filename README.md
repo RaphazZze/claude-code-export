@@ -103,9 +103,9 @@ python3 tests/test_export.py            # run
 python3 tests/test_export.py --update   # regenerate the expected export
 ```
 
-`tests/kitchen_sink.jsonl` holds one record of every class this tool has ever
-mishandled, and `tests/kitchen_sink.expected.md` is the Markdown it should
-produce. The test diffs the two, checks that `--count-only` agrees with the
+`tests/every_record_class.jsonl` holds one record of every class this tool has
+ever mishandled, and `tests/every_record_class.expected.md` is the Markdown it
+should produce. The test diffs the two, checks that `--count-only` agrees with the
 export, and asserts that none of the content the fixture deliberately carries
 — command bodies, injected skill bodies, task payloads, sidechain messages,
 absolute home paths — reaches the output.

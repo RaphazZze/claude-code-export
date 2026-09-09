@@ -1,5 +1,5 @@
 # Claude Code Session Export
-**Source:** `kitchen_sink.jsonl`  
+**Source:** `every_record_class.jsonl`  
 **Exported:** <NORMALISED>
 
 > **Sanitization note:** This export has been cleaned for readability. Absolute paths were converted to relative paths. Tool call outputs, thinking blocks, and internal system tags were removed. File creations and modifications are noted inline.

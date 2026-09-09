@@ -4,8 +4,8 @@
     python3 tests/test_export.py            # run the test
     python3 tests/test_export.py --update   # regenerate the expected export
 
-`kitchen_sink.jsonl` carries one record of every class the exporter has ever
-mishandled, so the diff below is the guard on all of them at once:
+`every_record_class.jsonl` carries one record of every class the exporter has
+ever mishandled, so the diff below is the guard on all of them at once:
 
   - a skill injection arriving as a user message (the body must not appear;
     the marker comes from the assistant's own `Skill` call)
@@ -55,8 +55,8 @@ from zoneinfo import ZoneInfo
 
 HERE = pathlib.Path(__file__).resolve().parent
 EXPORTER = HERE.parent / "claudecode_export.py"
-FIXTURE = HERE / "kitchen_sink.jsonl"
-EXPECTED = HERE / "kitchen_sink.expected.md"
+FIXTURE = HERE / "every_record_class.jsonl"
+EXPECTED = HERE / "every_record_class.expected.md"
 
 # The fixture's paths are rooted here, so sanitization is exercised against a
 # synthetic home rather than whatever machine happens to be running the test.
