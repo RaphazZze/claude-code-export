@@ -291,6 +291,36 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
                     skip_next_user = False
                     continue
 
+                # A compaction summary is written by the harness, not the user:
+                # a templated digest of everything before the compaction point,
+                # re-injected as the continued session's first message. It is
+                # not dialogue, so it does not belong in a dialogue export.
+                # `/compact` compacts in place, so the conversation it digests
+                # is still in this same file, above it — drop the digest and
+                # leave a marker. If it ever names a *different* session file,
+                # say so, because then the dialogue above really is missing.
+                if obj.get('isCompactSummary'):
+                    digest = content if isinstance(content, str) else ''
+                    ref = re.search(r'(/[^\s`"\']+\.jsonl)', digest)
+                    ref_path = Path(ref.group(1)) if ref else None
+                    same_file = (ref_path is not None
+                                 and ref_path.resolve() == Path(jsonl_path).resolve())
+                    if ref_path is not None and not same_file:
+                        marker = ("> `⇱` Context compacted. The harness summary was dropped; "
+                                  f"the dialogue it covers is in `{ref_path.name}`, "
+                                  "which is not part of this export.")
+                    else:
+                        marker = ("> `⇱` Context compacted. The harness summary was dropped — "
+                                  "the dialogue it covers appears above, in full.")
+                    messages.append(('assistant', marker, date_str, time_str))
+                    continue
+
+                # The bare `/compact` the user typed arrives twice: once as plain
+                # text, once as a <command-name> record rendered as a marker
+                # below. Drop the plain one so the boundary reads as one event.
+                if isinstance(content, str) and content.strip() == '/compact':
+                    continue
+
                 # Claude Code skill injections arrive as user messages whose first
                 # text block starts with "Base directory for this skill: <path>".
                 # The invocation itself is the assistant's `Skill` tool call and
@@ -485,6 +515,8 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
     lines.append("> **Sanitization note:** This export has been cleaned for readability. "
                  "Absolute paths were converted to relative paths. "
                  "Tool call outputs, thinking blocks, and internal system tags were removed. "
+                 "Harness compaction summaries were dropped and marked, so the dialogue "
+                 "reads unbroken. "
                  "File creations and modifications are noted inline.")
     lines.append("")
     lines.append("---")

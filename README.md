@@ -35,6 +35,13 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 - Internal system tags (`<system-reminder>`, `<local-command-caveat>`, `<ide_opened_file>`)
 - Sidechain messages
 - File history snapshots
+- Harness compaction summaries. When context is compacted the harness writes a
+  templated digest of the dialogue so far and re-injects it as the continued
+  session's first message, under the `user` role. It is not dialogue, so it is
+  replaced by a `⇱ Context compacted` marker. `/compact` compacts in place, so
+  the conversation it digests is still above it in the same file and the export
+  loses nothing; if the digest ever names a *different* session file, the marker
+  says so, because then the dialogue really is elsewhere
 
 ### Sanitization
 
