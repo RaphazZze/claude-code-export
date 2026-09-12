@@ -16,7 +16,12 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 - Sub-agent dispatches (description, agent type and model)
 - Skill invocations (name only — marked as `⚙ Skill: <name>`, attributed to
   the assistant, since the assistant is what invokes a skill)
-- Slash commands typed by the user (marked as `⌘ Command: /<name>`)
+- Slash commands typed by the user (marked as `⌘ Command: /<name>`). `/model`
+  additionally names the model it selected — `⌘ Command: /model → Sonnet 5`
+- The model that produced the session, on a `**Model:**` header line, and a
+  `◆ Model changed to <id>` marker at any point the model actually changes
+  mid-session. Harness-written lines (`<synthetic>`) are not a model and never
+  read as a change
 - Background task completions (marked as `⚑ Task notification: <summary>`)
 - MCP tool calls (server, method, and all input parameters)
 - User question prompts and answers
@@ -42,6 +47,7 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
   the conversation it digests is still above it in the same file and the export
   loses nothing; if the digest ever names a *different* session file, the marker
   says so, because then the dialogue really is elsewhere
+- Command output, except the model name from `/model`
 
 ### Sanitization
 

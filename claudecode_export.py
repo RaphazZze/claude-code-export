@@ -54,6 +54,11 @@ def clean(text):
     return text.strip()
 
 
+def strip_ansi(text):
+    """Drop terminal colour codes. Command output carries them; Markdown doesn't."""
+    return re.sub(r'\x1b\[[0-9;]*m', '', text)
+
+
 def task_notification_marker(text):
     """One-line marker for a background-task completion ping, or None.
 
@@ -257,6 +262,9 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
     messages = []
     pending_questions = {}
     skip_next_user = False
+    models_seen = []          # real model ids, in order of first appearance
+    last_model = None         # to notice a change mid-session
+    pending_model_cmd = None  # a /model marker waiting for its output line
 
     with open(jsonl_path, encoding='utf-8', errors='replace') as f:
         for line in f:
@@ -289,7 +297,29 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
             if role == 'user':
                 if skip_next_user:
                     skip_next_user = False
-                    continue
+                    if pending_model_cmd is not None:
+                        cmd_date, cmd_time = pending_model_cmd
+                        pending_model_cmd = None
+                        raw = strip_ansi(content if isinstance(content, str) else '')
+                        picked = re.search(r'Set model to `([^`]+)`', raw)
+                        if picked:
+                            messages.append((
+                                'user',
+                                f"> `⌘` Command: **/model** → **{picked.group(1)}**",
+                                cmd_date, cmd_time,
+                            ))
+                            continue
+                        # No model named: emit the bare marker. If this record
+                        # isn't the command's output at all, let it fall through
+                        # to normal handling rather than swallowing what may be
+                        # real dialogue.
+                        messages.append((
+                            'user', "> `⌘` Command: **/model**", cmd_date, cmd_time,
+                        ))
+                        if '<local-command-stdout>' in raw:
+                            continue
+                    else:
+                        continue
 
                 # A compaction summary is written by the harness, not the user:
                 # a templated digest of everything before the compaction point,
@@ -344,9 +374,17 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
                 # and drop that body.
                 cmd_match = re.search(r'<command-name>/?([^<\s]+)</command-name>', skill_text)
                 if cmd_match:
+                    cmd_name = cmd_match.group(1)
+                    # `/model` is the one command whose output is worth keeping:
+                    # it names the model that was selected. It arrives as the
+                    # next user record, so hold the marker until we have it.
+                    if cmd_name == 'model':
+                        pending_model_cmd = (date_str, time_str)
+                        skip_next_user = True
+                        continue
                     messages.append((
                         'user',
-                        f"> `⌘` Command: **/{cmd_match.group(1)}**",
+                        f"> `⌘` Command: **/{cmd_name}**",
                         date_str, time_str
                     ))
                     skip_next_user = True
@@ -379,6 +417,21 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
                         messages.append(('user', '\n\n'.join(text_parts), date_str, time_str))
 
             elif role == 'assistant':
+                # Every assistant record carries the model that produced it.
+                # `<synthetic>` means the harness wrote the line itself (an
+                # interruption notice, "No response requested."), so it is not
+                # a model and must never read as a change.
+                model_id = msg.get('model') or ''
+                if model_id and model_id != '<synthetic>':
+                    if model_id not in models_seen:
+                        models_seen.append(model_id)
+                    if last_model and model_id != last_model:
+                        messages.append((
+                            'assistant',
+                            f"> `◆` Model changed to `{model_id}`",
+                            date_str, time_str,
+                        ))
+                    last_model = model_id
                 if isinstance(content, list):
                     text_parts = []
                     for block in content:
@@ -510,6 +563,8 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
     lines = []
     lines.append(f"# Claude Code Session Export")
     lines.append(f"**Source:** `{jsonl_path.name}`  ")
+    if models_seen:
+        lines.append("**Model:** " + " → ".join(f"`{m}`" for m in models_seen) + "  ")
     lines.append(f"**Exported:** {datetime.now().strftime('%Y-%m-%d')}")
     lines.append("")
     lines.append("> **Sanitization note:** This export has been cleaned for readability. "
