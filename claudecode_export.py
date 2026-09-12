@@ -333,8 +333,14 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
                     digest = content if isinstance(content, str) else ''
                     ref = re.search(r'(/[^\s`"\']+\.jsonl)', digest)
                     ref_path = Path(ref.group(1)) if ref else None
+                    # Compare filenames, not resolved paths: the digest records
+                    # the transcript's absolute path at the time of compaction,
+                    # so a transcript that has since been copied or moved would
+                    # resolve as a different file and the marker would claim the
+                    # dialogue is elsewhere when it is right here. Session
+                    # filenames are UUIDs, so this does not collide in practice.
                     same_file = (ref_path is not None
-                                 and ref_path.resolve() == Path(jsonl_path).resolve())
+                                 and ref_path.name == Path(jsonl_path).name)
                     if ref_path is not None and not same_file:
                         marker = ("> `⇱` Context compacted. The harness summary was dropped; "
                                   f"the dialogue it covers is in `{ref_path.name}`, "

@@ -1,8 +1,9 @@
 # Claude Code Session Export
 **Source:** `every_record_class.jsonl`  
+**Model:** `claude-opus-5` → `claude-sonnet-5`  
 **Exported:** <NORMALISED>
 
-> **Sanitization note:** This export has been cleaned for readability. Absolute paths were converted to relative paths. Tool call outputs, thinking blocks, and internal system tags were removed. File creations and modifications are noted inline.
+> **Sanitization note:** This export has been cleaned for readability. Absolute paths were converted to relative paths. Tool call outputs, thinking blocks, and internal system tags were removed. Harness compaction summaries were dropped and marked, so the dialogue reads unbroken. File creations and modifications are noted inline.
 
 ---
 
@@ -133,5 +134,91 @@ Next morning — ship it.
 ### ❯ Claude · 9:05 AM
 
 Shipped.
+
+---
+
+### [March 25, 2026]
+
+### ❯ User · 9:06 AM
+
+Which model am I talking to?
+
+---
+
+### ❯ Claude · 9:06 AM
+
+The one named in the header.
+
+---
+
+### ❯ Claude · 9:06 AM
+
+No response requested.
+
+---
+
+### ❯ Claude · 9:06 AM
+
+Still the same model.
+
+---
+
+### ❯ User · 9:07 AM
+
+> `⌘` Command: **/model** → **Sonnet 5**
+
+---
+
+### ❯ Claude · 9:07 AM
+
+> `◆` Model changed to `claude-sonnet-5`
+
+---
+
+### ❯ Claude · 9:07 AM
+
+Cheaper from here.
+
+---
+
+### ❯ User · 9:08 AM
+
+> `⌘` Command: **/model**
+
+---
+
+### ❯ User · 9:08 AM
+
+I closed the picker without choosing.
+
+---
+
+### ❯ Claude · 9:09 AM
+
+> `⇱` Context compacted. The harness summary was dropped — the dialogue it covers appears above, in full.
+
+---
+
+### ❯ User · 9:09 AM
+
+> `⌘` Command: **/compact**
+
+---
+
+### ❯ Claude · 9:09 AM
+
+Picking up where we left off.
+
+---
+
+### ❯ Claude · 9:10 AM
+
+> `⇱` Context compacted. The harness summary was dropped; the dialogue it covers is in `9f3c1a20-earlier-session.jsonl`, which is not part of this export.
+
+---
+
+### ❯ Claude · 9:10 AM
+
+Resumed from the earlier transcript.
 
 ---

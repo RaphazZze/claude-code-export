@@ -28,6 +28,15 @@ ever mishandled, so the diff below is the guard on all of them at once:
   - cloud-storage paths that would otherwise reveal the machine's setup
   - consecutive marker-only blocks that merge, and a duplicate that dedupes
   - a date change, which starts a new date heading
+  - assistant records carrying a model, including a `<synthetic>` one, which is
+    a harness-written line rather than a model and must not read as a change
+  - a `/model` command whose output names the model it selected, and one that
+    names nothing, where the record after it is real dialogue and must survive
+  - a harness compaction digest, which is not dialogue: once naming this same
+    transcript, where the dialogue it covers is still above it, and once naming
+    a different one, where it genuinely is elsewhere
+  - the bare `/compact` the user typed, which arrives a second time as a
+    `<command-name>` record and must not be counted twice
 
 **`--update` is not a way to make a failure go away.** The expected file is
 checked in, so a regenerated one lands as a reviewable diff — read that diff
@@ -64,8 +73,8 @@ FAKE_HOME = "/home/testuser"
 # marker-only blocks merge. `--count-only` has to agree with these too: it is
 # a second route to the same answer, and the two drifting apart is the defect
 # this pair of assertions exists to catch.
-EXPECT_USER = 7
-EXPECT_ASSISTANT = 9
+EXPECT_USER = 12
+EXPECT_ASSISTANT = 18
 
 # Content the fixture deliberately contains and the export must never carry.
 # The full diff would catch each of these as an added line; naming them
@@ -85,6 +94,12 @@ FORBIDDEN = [
     ("<system-reminder>", "a raw system-reminder tag"),
     ("<task-notification>", "a raw task-notification tag"),
     ("trackedFileBackups", "a file-history-snapshot record"),
+    ("Primary Request and Intent", "a harness compaction digest's body"),
+    ("A digest the harness wrote", "a compaction digest attributed to the user"),
+    ("ran out of context", "a compaction digest's opening line"),
+    ("Compacted (ctrl+o", "the /compact command's own output"),
+    ("saved as your default", "the /model command's output, beyond the model name"),
+    ("\x1b[", "a terminal colour code from command output"),
     (FAKE_HOME, "an unsanitized absolute home path"),
 ]
 
