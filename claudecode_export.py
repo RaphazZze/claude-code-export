@@ -717,7 +717,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("files", nargs="+", help=".jsonl file(s) to convert")
-    parser.add_argument("-o", "--output", default=".", help="output directory (default: current dir)")
+    parser.add_argument("-o", "--output", default="claude-session-exports", help="output directory (default: claude-session-exports/, created under the current dir)")
     parser.add_argument("-n", "--name", default="User", help="label for user messages (default: User)")
     parser.add_argument("-A", "--assistant-name", default="Claude", help="label for assistant messages (default: Claude)")
     parser.add_argument("-t", "--time", choices=["12", "24"], default="12", help="time format (default: 12)")
