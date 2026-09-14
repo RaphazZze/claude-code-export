@@ -98,7 +98,7 @@ python3 claudecode_export.py --help
 | `-n`, `--name` | Label for user messages | `User` |
 | `-A`, `--assistant-name` | Label for assistant messages | `Claude` |
 | `-t`, `--time` | Time format: `12` or `24` | `12` |
-| `-o`, `--output` | Output directory | Current dir |
+| `-o`, `--output` | Output directory | `claude-session-exports/` (created under the current dir) |
 | `-c`, `--count-only` | Print message counts without exporting | off |
 | `-a`, `--include-sub-agents` | Include `agent-*.jsonl` sub-agent files | off |
 
