@@ -37,6 +37,11 @@ ever mishandled, so the diff below is the guard on all of them at once:
     a different one, where it genuinely is elsewhere
   - the bare `/compact` the user typed, which arrives a second time as a
     `<command-name>` record and must not be counted twice
+  - pasted text inside the harness's `<pasted_content id="…">` wrapper, and an
+    `<ide_selection>` wrapper, both of which must not reach the page raw
+  - `api-request-blob` records, which replay earlier turns with a role but no
+    timestamp and are not dialogue
+  - the same `Edit` three times in a row, which shows as one marker
 
 **`--update` is not a way to make a failure go away.** The expected file is
 checked in, so a regenerated one lands as a reviewable diff — read that diff
@@ -73,8 +78,8 @@ FAKE_HOME = "/home/testuser"
 # marker-only blocks merge. `--count-only` has to agree with these too: it is
 # a second route to the same answer, and the two drifting apart is the defect
 # this pair of assertions exists to catch.
-EXPECT_USER = 12
-EXPECT_ASSISTANT = 18
+EXPECT_USER = 14
+EXPECT_ASSISTANT = 19
 
 # Content the fixture deliberately contains and the export must never carry.
 # The full diff would catch each of these as an added line; naming them
@@ -100,6 +105,11 @@ FORBIDDEN = [
     ("Compacted (ctrl+o", "the /compact command's own output"),
     ("saved as your default", "the /model command's output, beyond the model name"),
     ("\x1b[", "a terminal colour code from command output"),
+    ("pasted_content", "the harness's pasted-text wrapper"),
+    ("<ide_selection>", "a raw ide_selection tag"),
+    ("This may or may not be related", "the ide_selection boilerplate"),
+    ("by the API request log", "an api-request-blob replay"),
+    ("_[File attached", "an attachment notice in the old italic form"),
     (FAKE_HOME, "an unsanitized absolute home path"),
 ]
 

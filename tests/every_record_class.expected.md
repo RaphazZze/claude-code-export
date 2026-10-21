@@ -3,7 +3,7 @@
 **Model:** `claude-opus-5` → `claude-sonnet-5`  
 **Exported:** <NORMALISED>
 
-> **Sanitization note:** This export has been cleaned for readability. Absolute paths were converted to relative paths. Tool call outputs, thinking blocks, and internal system tags were removed. Harness compaction summaries were dropped and marked, so the dialogue reads unbroken. File creations and modifications are noted inline.
+> **Sanitization note:** This export has been cleaned for readability. Absolute paths were converted to relative paths. Tool call outputs, thinking blocks, and internal system tags were removed, as were the harness's wrappers around pasted text and its API request replays. Harness compaction summaries were dropped and marked, so the dialogue reads unbroken. File creations and modifications are noted inline.
 
 ---
 
@@ -63,9 +63,9 @@ Also check the config while you are in there.
 
 Here are the two files.
 
-_[Image attached: image/png]_
+> `📎` Image attached: image/png
 
-_[File attached: quarterly.pdf]_
+> `📎` File attached: quarterly.pdf
 
 ---
 
@@ -220,5 +220,35 @@ Picking up where we left off.
 ### ❯ Claude · 9:10 AM
 
 Resumed from the earlier transcript.
+
+---
+
+### ❯ User · 9:11 AM
+
+> `📎` File attached: brief.md
+
+The brief, pasted from my notes.
+
+---
+
+### ❯ User · 9:12 AM
+
+> `⌖` Selected lines 3 to 4 of `notes/plan.md`
+>
+> Step one.
+>
+> Step two.
+
+Does this order still hold?
+
+---
+
+### ❯ Claude · 9:13 AM
+
+It holds. Updating the plan.
+
+> `~` Modified `notes/plan.md`
+
+> `~` Modified `src/app.py`
 
 ---

@@ -11,7 +11,8 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 - All user and assistant text messages
 - Queued messages — text typed while Claude is mid-turn, which the harness
   stores as an attachment rather than a user message
-- File creations (`+`) and modifications (`~`)
+- File creations (`+`) and modifications (`~`). A call repeated word for word
+  in a row (a retried edit) shows once
 - Shell commands (`$`) — the one-line description only, never the command
 - Sub-agent dispatches (description, agent type and model)
 - Skill invocations (name only — marked as `⚙ Skill: <name>`, attributed to
@@ -25,8 +26,10 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 - Background task completions (marked as `⚑ Task notification: <summary>`)
 - MCP tool calls (server, method, and all input parameters)
 - User question prompts and answers
-- Image and file attachment notices
-- IDE selection context
+- Image and file attachment notices (marked as `📎 File attached: <name>`)
+- Pasted text, without the `<pasted_content>` wrapper the harness puts around it
+- IDE selection context (marked as `⌖ Selected lines <a> to <b> of <file>`,
+  the selected text quoted below)
 
 ### What's stripped
 
@@ -39,7 +42,9 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
   bodies, workflow resume prompts, image-resize notices
 - Internal system tags (`<system-reminder>`, `<local-command-caveat>`, `<ide_opened_file>`)
 - Sidechain messages
-- File history snapshots
+- File history snapshots, and any other record that isn't a `user` or
+  `assistant` turn — notably the API request log (`api-request-blob`), which
+  replays earlier messages and would otherwise repeat whole turns
 - Harness compaction summaries. When context is compacted the harness writes a
   templated digest of the dialogue so far and re-injects it as the continued
   session's first message, under the `user` role. It is not dialogue, so it is

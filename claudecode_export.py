@@ -46,11 +46,27 @@ def skill_name_from_injection(text):
     return Path(path).name or None
 
 
+def ide_selection_marker(m):
+    """Render an <ide_selection> wrapper as a marker, its selected text quoted."""
+    body = m.group(1).replace('This may or may not be related to the current task.', '').strip()
+    head, _, selected = body.partition('\n')
+    head = re.sub(r'^The user selected the (lines .+?) from (.+?):?$', r'Selected \1 of \2', head)
+    marker = f"> `⌖` {head}"
+    if selected.strip():
+        marker += "\n>\n" + '\n'.join(
+            f"> {ln}" if ln.strip() else ">" for ln in selected.strip('\n').split('\n'))
+    return f"\n\n{marker}\n\n"
+
+
 def clean(text):
     """Remove internal Claude Code tags from user messages."""
     text = re.sub(r'<local-command-caveat>.*?</local-command-caveat>', '', text, flags=re.DOTALL)
     text = re.sub(r'<ide_opened_file>.*?</ide_opened_file>', '', text, flags=re.DOTALL)
     text = re.sub(r'<system-reminder>.*?</system-reminder>', '', text, flags=re.DOTALL)
+    text = re.sub(r'<ide_selection>(.*?)</ide_selection>', ide_selection_marker, text, flags=re.DOTALL)
+    # The harness wraps pasted text in <pasted_content id="…"> — its closing
+    # tag repeats the id. The wrapper is plumbing; the paste is the user's.
+    text = re.sub(r'</?pasted_content\b[^>]*>\n?', '', text)
     return text.strip()
 
 
@@ -92,10 +108,10 @@ def render_user_blocks(blocks, pending_questions=None):
                 parts.append(t)
         elif btype == 'image':
             media = block.get('source', {}).get('media_type', 'image')
-            parts.append(f"_[Image attached: {media}]_")
+            parts.append(f"> `📎` Image attached: {media}")
         elif btype == 'document':
             title = block.get('title') or block.get('source', {}).get('filename') or 'document'
-            parts.append(f"_[File attached: {title}]_")
+            parts.append(f"> `📎` File attached: {title}")
         elif btype == 'tool_result' and pending_questions:
             tid = block.get('tool_use_id')
             if tid and tid in pending_questions:
@@ -276,6 +292,12 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
             if obj.get('type') == 'file-history-snapshot':
                 continue
             if obj.get('isSidechain'):
+                continue
+            # Only `user` and `assistant` records are the conversation. Newer
+            # harness builds also log each API request (`api-request-blob`),
+            # replaying earlier messages with a role but no timestamp — read
+            # as dialogue, they repeat whole turns under an untimed header.
+            if obj.get('type') not in ('user', 'assistant', 'attachment'):
                 continue
 
             # Queued user messages have no `message` key — handle before the
@@ -535,6 +557,11 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
                                     qinfos.append({'question': q.get('question', ''), 'options': opts})
                                 if tid and qinfos:
                                     pending_questions[tid] = qinfos
+                    # A retried call repeats its marker word for word — one
+                    # line says it as well as three.
+                    text_parts = [p for i, p in enumerate(text_parts)
+                                  if i == 0 or p != text_parts[i - 1]
+                                  or not MARKER_RE.match(p)]
                     if text_parts:
                         messages.append(('assistant', '\n\n'.join(text_parts), date_str, time_str))
                 elif isinstance(content, str):
@@ -575,7 +602,8 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
     lines.append("")
     lines.append("> **Sanitization note:** This export has been cleaned for readability. "
                  "Absolute paths were converted to relative paths. "
-                 "Tool call outputs, thinking blocks, and internal system tags were removed. "
+                 "Tool call outputs, thinking blocks, and internal system tags were removed, "
+                 "as were the harness's wrappers around pasted text and its API request replays. "
                  "Harness compaction summaries were dropped and marked, so the dialogue "
                  "reads unbroken. "
                  "File creations and modifications are noted inline.")
