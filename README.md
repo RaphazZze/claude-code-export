@@ -11,8 +11,7 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 - All user and assistant text messages
 - Queued messages — text typed while Claude is mid-turn, which the harness
   stores as an attachment rather than a user message
-- File creations (`+`) and modifications (`~`). A call repeated word for word
-  in a row (a retried edit) shows once
+- File creations (`+`) and modifications (`~`)
 - Shell commands (`$`) — the one-line description only, never the command
 - Sub-agent dispatches (description, agent type and model)
 - Skill invocations (name only — marked as `⚙ Skill: <name>`, attributed to
@@ -27,7 +26,8 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 - MCP tool calls (server, method, and all input parameters)
 - User question prompts and answers
 - Image and file attachment notices (marked as `📎 File attached: <name>`)
-- Pasted text, without the `<pasted_content>` wrapper the harness puts around it
+- Pasted text, verbatim, without the `<pasted_content>` wrapper the harness
+  puts around it
 - IDE selection context (marked as `⌖ Selected lines <a> to <b> of <file>`,
   the selected text quoted below)
 
@@ -40,11 +40,12 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 - Background task result payloads (the summary line is kept)
 - Harness-injected messages that arrive with the `user` role — plugin skill
   bodies, workflow resume prompts, image-resize notices
-- Internal system tags (`<system-reminder>`, `<local-command-caveat>`, `<ide_opened_file>`)
+- Internal system tags (`<system-reminder>`, `<local-command-caveat>`, `<ide_opened_file>`),
+  and an assistant text block that is nothing but a system reminder
 - Sidechain messages
-- File history snapshots, and any other record that isn't a `user` or
-  `assistant` turn — notably the API request log (`api-request-blob`), which
-  replays earlier messages and would otherwise repeat whole turns
+- File history snapshots
+- The API request log (`api-request-blob` records), which replays earlier
+  messages without timestamps and would otherwise repeat whole turns
 - Harness compaction summaries. When context is compacted the harness writes a
   templated digest of the dialogue so far and re-injects it as the continued
   session's first message, under the `user` role. It is not dialogue, so it is

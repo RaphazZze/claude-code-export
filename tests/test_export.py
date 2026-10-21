@@ -37,11 +37,18 @@ ever mishandled, so the diff below is the guard on all of them at once:
     a different one, where it genuinely is elsewhere
   - the bare `/compact` the user typed, which arrives a second time as a
     `<command-name>` record and must not be counted twice
-  - pasted text inside the harness's `<pasted_content id="…">` wrapper, and an
-    `<ide_selection>` wrapper, both of which must not reach the page raw
+  - pasted text inside the harness's `<pasted_content id="…">` wrapper, once
+    inside the user's own ``` fence, and an `<ide_selection>` wrapper — the
+    wrappers must not reach the page raw
+  - a user who merely mentions `<pasted_content`, across lines and in inline
+    code, whose text must survive whole
   - `api-request-blob` records, which replay earlier turns with a role but no
-    timestamp and are not dialogue
-  - the same `Edit` three times in a row, which shows as one marker
+    timestamp and are not dialogue, and a role-bearing record with no `type`
+    at all, an older shape that must still export
+  - the same `Edit` three times, one call per record with its result between,
+    which shows as one marker
+  - an image-only user turn followed by a command, which stay two turns
+  - an assistant text block that is wholly a harness system reminder
 
 **`--update` is not a way to make a failure go away.** The expected file is
 checked in, so a regenerated one lands as a reviewable diff — read that diff
@@ -78,8 +85,8 @@ FAKE_HOME = "/home/testuser"
 # marker-only blocks merge. `--count-only` has to agree with these too: it is
 # a second route to the same answer, and the two drifting apart is the defect
 # this pair of assertions exists to catch.
-EXPECT_USER = 14
-EXPECT_ASSISTANT = 19
+EXPECT_USER = 18
+EXPECT_ASSISTANT = 21
 
 # Content the fixture deliberately contains and the export must never carry.
 # The full diff would catch each of these as an added line; naming them
@@ -105,7 +112,9 @@ FORBIDDEN = [
     ("Compacted (ctrl+o", "the /compact command's own output"),
     ("saved as your default", "the /model command's output, beyond the model name"),
     ("\x1b[", "a terminal colour code from command output"),
-    ("pasted_content", "the harness's pasted-text wrapper"),
+    ('pasted_content id="4f2a"', "the harness's pasted-text wrapper"),
+    ('pasted_content id="9c1d"', "a pasted-text wrapper inside a user fence"),
+    ("Tool ran without output", "a system reminder in an assistant text block"),
     ("<ide_selection>", "a raw ide_selection tag"),
     ("This may or may not be related", "the ide_selection boilerplate"),
     ("by the API request log", "an api-request-blob replay"),

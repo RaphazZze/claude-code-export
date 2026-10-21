@@ -46,9 +46,23 @@ def skill_name_from_injection(text):
     return Path(path).name or None
 
 
-def ide_selection_marker(m):
-    """Render an <ide_selection> wrapper as a marker, its selected text quoted."""
-    body = m.group(1).replace('This may or may not be related to the current task.', '').strip()
+SYSTEM_REMINDER_RE = re.compile(r'<system-reminder\b[^>]*>.*?</system-reminder>', re.DOTALL)
+
+# Harness wrappers around content that is the user's own: the file text they
+# selected in the IDE, and text they pasted. The harness puts each paste tag on
+# a line of its own, and its closing tag repeats the id; requiring both lines
+# keeps a user who merely *mentions* the tag from losing text to the match.
+WRAPPED_RE = re.compile(
+    r'<ide_selection>(?P<sel>.*?)</ide_selection>'
+    r'|^[ \t]*<pasted_content\b[^>\n]*>[ \t]*\n(?P<paste>.*?)'
+    r'^[ \t]*</pasted_content\b[^>\n]*>[ \t]*(?:\n|$)',
+    re.DOTALL | re.MULTILINE,
+)
+
+
+def ide_selection_marker(body):
+    """Render an <ide_selection> wrapper's body as a marker, the selection quoted."""
+    body = re.sub(r'\s*This may or may not be related to the current task\.\s*$', '', body).strip()
     head, _, selected = body.partition('\n')
     head = re.sub(r'^The user selected the (lines .+?) from (.+?):?$', r'Selected \1 of \2', head)
     marker = f"> `⌖` {head}"
@@ -58,16 +72,29 @@ def ide_selection_marker(m):
     return f"\n\n{marker}\n\n"
 
 
-def clean(text):
-    """Remove internal Claude Code tags from user messages."""
+def strip_harness_tags(text):
     text = re.sub(r'<local-command-caveat>.*?</local-command-caveat>', '', text, flags=re.DOTALL)
     text = re.sub(r'<ide_opened_file>.*?</ide_opened_file>', '', text, flags=re.DOTALL)
-    text = re.sub(r'<system-reminder>.*?</system-reminder>', '', text, flags=re.DOTALL)
-    text = re.sub(r'<ide_selection>(.*?)</ide_selection>', ide_selection_marker, text, flags=re.DOTALL)
-    # The harness wraps pasted text in <pasted_content id="…"> — its closing
-    # tag repeats the id. The wrapper is plumbing; the paste is the user's.
-    text = re.sub(r'</?pasted_content\b[^>]*>\n?', '', text)
-    return text.strip()
+    return SYSTEM_REMINDER_RE.sub('', text)
+
+
+def clean(text):
+    """Remove internal Claude Code tags from user messages.
+
+    Selected and pasted text is the user's, kept verbatim: the tag strips run
+    only between those spans, so a paste that quotes a harness tag survives.
+    """
+    out = []
+    pos = 0
+    for m in WRAPPED_RE.finditer(text):
+        out.append(strip_harness_tags(text[pos:m.start()]))
+        if m.group('sel') is not None:
+            out.append(ide_selection_marker(m.group('sel')))
+        else:
+            out.append(m.group('paste'))
+        pos = m.end()
+    out.append(strip_harness_tags(text[pos:]))
+    return ''.join(out).strip()
 
 
 def strip_ansi(text):
@@ -164,13 +191,17 @@ def fix_table_spacing(text):
 # "> `$` Rebuild the venv", "> `~` Modified `memory/file.md`".
 MARKER_RE = re.compile(r'^> `[^`]+`')
 
+# Markers that stand for what the user *sent* — an attachment, a selection —
+# rather than a tool event. A turn made of them is still a turn of its own.
+CONTENT_MARKER_RE = re.compile(r'^> `(?:📎|⌖)`', re.MULTILINE)
+
 
 def is_marker_only(text):
     """True if a message is nothing but tool markers — no prose of its own."""
     lines = [ln for ln in text.split('\n') if ln.strip()]
     return bool(lines) and bool(MARKER_RE.match(lines[0])) and all(
         ln.startswith('>') for ln in lines
-    )
+    ) and not CONTENT_MARKER_RE.search(text)
 
 
 # Spans where a path must be left byte-for-byte alone. Backticking inside a
@@ -293,11 +324,13 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
                 continue
             if obj.get('isSidechain'):
                 continue
-            # Only `user` and `assistant` records are the conversation. Newer
-            # harness builds also log each API request (`api-request-blob`),
-            # replaying earlier messages with a role but no timestamp — read
-            # as dialogue, they repeat whole turns under an untimed header.
-            if obj.get('type') not in ('user', 'assistant', 'attachment'):
+            # Harness builds since mid-October 2026 log each API request as an
+            # `api-request-blob`, replaying earlier messages with a role but no
+            # timestamp — read as dialogue, they repeat whole turns under an
+            # untimed header. Skipped by name, not by whitelisting the types
+            # known to be dialogue, so an older or unfamiliar record shape still
+            # exports instead of vanishing silently.
+            if obj.get('type') == 'api-request-blob':
                 continue
 
             # Queued user messages have no `message` key — handle before the
@@ -468,6 +501,12 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
                         btype = block.get('type')
                         if btype == 'text':
                             t = fix_table_spacing(block.get('text', '').strip())
+                            # A text block that is wholly a system reminder was
+                            # written by the harness, not the model. Only the
+                            # whole block goes: prose that merely mentions the
+                            # tag is the model's own words.
+                            if SYSTEM_REMINDER_RE.fullmatch(t):
+                                continue
                             if t:
                                 text_parts.append(t)
                         elif btype == 'tool_use':
@@ -557,11 +596,6 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
                                     qinfos.append({'question': q.get('question', ''), 'options': opts})
                                 if tid and qinfos:
                                     pending_questions[tid] = qinfos
-                    # A retried call repeats its marker word for word — one
-                    # line says it as well as three.
-                    text_parts = [p for i, p in enumerate(text_parts)
-                                  if i == 0 or p != text_parts[i - 1]
-                                  or not MARKER_RE.match(p)]
                     if text_parts:
                         messages.append(('assistant', '\n\n'.join(text_parts), date_str, time_str))
                 elif isinstance(content, str):
