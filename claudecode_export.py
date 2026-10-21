@@ -167,6 +167,12 @@ def queued_prompt_parts(attachment):
     """
     if attachment.get('commandMode') != 'prompt':
         return []
+    # A sub-agent's hand-back delivered mid-turn arrives as a queued prompt
+    # too, flagged isMeta with origin.kind 'peer'. It is the agent's report,
+    # not the user — the same hand-back as a plain user record is isMeta and
+    # dropped already.
+    if attachment.get('isMeta') or (attachment.get('origin') or {}).get('kind') == 'peer':
+        return []
     prompt = attachment.get('prompt', '')
     if isinstance(prompt, str):
         t = clean(prompt)

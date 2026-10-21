@@ -38,6 +38,7 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 - Thinking blocks
 - Sub-agent prompts and skill bodies
 - Background task result payloads (the summary line is kept)
+- Sub-agent hand-backs, including those queued while the assistant was mid-turn
 - Harness-injected messages that arrive with the `user` role — plugin skill
   bodies, workflow resume prompts, image-resize notices
 - Internal system tags (`<system-reminder>`, `<local-command-caveat>`, `<ide_opened_file>`),

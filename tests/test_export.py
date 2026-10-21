@@ -12,7 +12,8 @@ ever mishandled, so the diff below is the guard on all of them at once:
   - a queued `queued_command` attachment, which has no `message` key and so
     never reaches the role dispatch
   - a queued attachment in `task-notification` mode, which is the harness
-    rather than the user
+    rather than the user, and a queued sub-agent hand-back (`isMeta`, origin
+    `peer`), which is the agent rather than the user
   - a background task notification carrying its whole result payload
   - an `isMeta` user record
   - a slash command, plus the expanded body the harness sends after it
@@ -101,6 +102,7 @@ FORBIDDEN = [
     ("Harness injection", "an isMeta harness record"),
     ("Expanded command output", "a slash command's expanded body"),
     ("Background ping", "a queued task-notification attachment"),
+    ("sub-agent report delivered mid-turn", "a queued sub-agent hand-back"),
     ("entire task result payload", "a task notification's payload"),
     ("Internal reminder", "a system-reminder tag's contents"),
     ("<system-reminder>", "a raw system-reminder tag"),
