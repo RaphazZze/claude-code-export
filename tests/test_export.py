@@ -21,7 +21,11 @@ ever mishandled, so the diff below is the guard on all of them at once:
   - a `Bash` call (description only, never the command) and one with no
     description at all
   - `Write`, `Edit`, `Skill` with args, `Agent` with a type and a model
-  - an MCP call with a single-line and a multi-line parameter
+  - an MCP call with a single-line and a multi-line parameter, which by
+    default shows the tool name only, as does the `Skill` call; with
+    `show_params` the parameters and args render, the multi-line one quoted
+    on every line. Both modes are also checked through the command line,
+    since that is the path a batch export takes
   - `AskUserQuestion` and the answer that arrives as a `tool_result`
   - image and document attachments
   - paths needing sanitization, including ones inside a markdown link, an
@@ -70,7 +74,9 @@ import difflib
 import importlib.util
 import pathlib
 import re
+import subprocess
 import sys
+import tempfile
 from zoneinfo import ZoneInfo
 
 HERE = pathlib.Path(__file__).resolve().parent
@@ -122,6 +128,21 @@ FORBIDDEN = [
     ("by the API request log", "an api-request-blob replay"),
     ("_[File attached", "an attachment notice in the old italic form"),
     (FAKE_HOME, "an unsanitized absolute home path"),
+    ("SELECT one", "an MCP call's multi-line parameter, without show_params"),
+    ("**limit:**", "an MCP call's single-line parameter, without show_params"),
+    ("--dry-run", "a Skill call's args, without show_params"),
+]
+
+# The subset of FORBIDDEN that `show_params` exists to control.
+PARAM_NEEDLES = ["SELECT one", "**limit:**", "--dry-run"]
+
+# What `show_params` must add back, so the opt-in cannot rot into a no-op.
+# Each line of the multi-line value carries the quote prefix, or the quote
+# would end at the first newline and spill the rest into the page.
+SHOW_PARAMS_REQUIRED = [
+    "> **limit:** 10",
+    "> **query:**\n> SELECT one\n> FROM two\n>\n> WHERE three = 4",
+    "Skill: **data-export** — `--dry-run`",
 ]
 
 EXPORT_DATE_RE = re.compile(r"^\*\*Exported:\*\* \d{4}-\d{2}-\d{2}$", re.M)
@@ -138,15 +159,34 @@ def load_exporter():
 
 
 def run_exporter(module):
-    """Return (normalised markdown, (user_count, assistant_count), count_only)."""
+    """Return (normalised markdown, (user_count, assistant_count), count_only,
+    markdown with show_params)."""
     real_home = pathlib.Path.home
     pathlib.Path.home = classmethod(lambda cls: pathlib.Path(FAKE_HOME))
     try:
         markdown, counts, _ = module.convert(FIXTURE, "User", "Claude", "12")
         count_only = module.count_messages(FIXTURE)
+        with_params, _, _ = module.convert(FIXTURE, "User", "Claude", "12",
+                                           show_params=True)
     finally:
         pathlib.Path.home = real_home
-    return EXPORT_DATE_RE.sub(EXPORT_DATE_PLACEHOLDER, markdown), counts, count_only
+    return (EXPORT_DATE_RE.sub(EXPORT_DATE_PLACEHOLDER, markdown), counts,
+            count_only, with_params)
+
+
+def run_cli(*flags):
+    """Export the fixture through the command line and return the Markdown.
+
+    convert() is reached directly above; this is the path a batch export
+    takes, so the flag's default and its wiring are checked here.
+    """
+    with tempfile.TemporaryDirectory() as out:
+        subprocess.run(
+            [sys.executable, "-I", str(EXPORTER), str(FIXTURE), "-o", out, *flags],
+            check=True, capture_output=True, text=True,
+        )
+        [md] = pathlib.Path(out).glob("*.md")
+        return md.read_text(encoding="utf-8")
 
 
 def main():
@@ -160,7 +200,7 @@ def main():
         return 1
 
     module = load_exporter()
-    actual, counts, count_only = run_exporter(module)
+    actual, counts, count_only, with_params = run_exporter(module)
 
     if args.update:
         EXPECTED.write_text(actual, encoding="utf-8")
@@ -200,7 +240,20 @@ def main():
         if needle in actual:
             failures.append(f"the export leaked {what} (found {needle!r})")
 
-    checks = 3 + len(FORBIDDEN)
+    for needle in SHOW_PARAMS_REQUIRED:
+        if needle not in with_params:
+            failures.append(f"show_params did not render {needle!r}")
+
+    cli_default, cli_params = run_cli(), run_cli("--show-params")
+    for needle in PARAM_NEEDLES:
+        if needle in cli_default:
+            failures.append(f"the command line's default export leaked {needle!r}")
+    for needle in SHOW_PARAMS_REQUIRED:
+        if needle not in cli_params:
+            failures.append(f"--show-params on the command line did not render {needle!r}")
+
+    checks = (3 + len(FORBIDDEN) + len(SHOW_PARAMS_REQUIRED)
+              + len(PARAM_NEEDLES) + len(SHOW_PARAMS_REQUIRED))
     if failures:
         for f in failures:
             print(f"FAIL  {f}")
@@ -208,7 +261,9 @@ def main():
         return 1
 
     print(f"PASS  {checks} checks · {len(actual.splitlines())} lines · "
-          f"{counts[0]} user / {counts[1]} assistant messages")
+          f"{counts[0]} user / {counts[1]} assistant messages · "
+          f"tool inputs absent by default and present with --show-params, "
+          f"through convert() and the command line")
     return 0
 
 

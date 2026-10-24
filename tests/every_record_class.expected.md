@@ -29,7 +29,7 @@ Reading it now.
 >
 > `~` Modified `.claude/settings.json`
 >
-> `⚙` Skill: **data-export** — `--dry-run`
+> `⚙` Skill: **data-export**
 >
 > `▶` Sub-agent: Summarise the changelog (general-purpose · haiku)
 
@@ -72,13 +72,6 @@ Here are the two files.
 ### ❯ Claude · 2:35 PM
 
 > `⚡` Demo: run_query
->
-> **limit:** 10
-> **query:**
-> SELECT one
-> FROM two
->
-> WHERE three = 4
 
 ---
 

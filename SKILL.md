@@ -1,6 +1,6 @@
 ---
 name: export-session
-description: Export a Claude Code session from its raw `.jsonl` file into a clean, readable Markdown file. Strips tool calls, tool results, code execution output, and internal thinking blocks — keeping only the human-readable dialogue. Messages are labelled with the speaker's name and time (e.g. `### ❯ User · 10:25 AM`). The date is shown once at the top and again only when it changes, for multi-day sessions. File and image attachments from the user are noted inline (e.g. ``> `📎` Image attached: image/jpeg``).
+description: Export a Claude Code session from its raw `.jsonl` file into a clean, readable Markdown file. Keeps a one-line marker per tool call; strips tool inputs, tool results, code execution output, and internal thinking blocks — keeping only the human-readable dialogue. Messages are labelled with the speaker's name and time (e.g. `### ❯ User · 10:25 AM`). The date is shown once at the top and again only when it changes, for multi-day sessions. File and image attachments from the user are noted inline (e.g. ``> `📎` Image attached: image/jpeg``).
 ---
 
 # export-session

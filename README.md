@@ -15,7 +15,8 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 - Shell commands (`$`) — the one-line description only, never the command
 - Sub-agent dispatches (description, agent type and model)
 - Skill invocations (name only — marked as `⚙ Skill: <name>`, attributed to
-  the assistant, since the assistant is what invokes a skill)
+  the assistant, since the assistant is what invokes a skill; the args too
+  with `--show-params`)
 - Slash commands typed by the user (marked as `⌘ Command: /<name>`). `/model`
   additionally names the model it selected — `⌘ Command: /model → Sonnet 5`
 - The model that produced the session, on a `**Model:**` header line, and a
@@ -23,7 +24,7 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
   mid-session. Harness-written lines (`<synthetic>`) are not a model and never
   read as a change
 - Background task completions (marked as `⚑ Task notification: <summary>`)
-- MCP tool calls (server, method, and all input parameters)
+- MCP tool calls (server and method; input parameters only with `--show-params`)
 - User question prompts and answers
 - Image and file attachment notices (marked as `📎 File attached: <name>`)
 - Pasted text, verbatim, without the `<pasted_content>` wrapper the harness
@@ -35,6 +36,11 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 
 - Tool call outputs and results
 - Shell command bodies (only the description survives)
+- Tool-call inputs — MCP parameters (search queries, prompts, email drafts
+  with their recipients and message IDs) and Skill args — unless
+  `--show-params` is passed. An export is often shared, and these are the
+  parts a reader should not see. The assistant's own replies are kept as
+  written, so a draft it quoted in its text still appears
 - Thinking blocks
 - Sub-agent prompts and skill bodies
 - Background task result payloads (the summary line is kept)
@@ -108,6 +114,7 @@ python3 claudecode_export.py --help
 | `-o`, `--output` | Output directory | `claude-session-exports/` (created under the current dir) |
 | `-c`, `--count-only` | Print message counts without exporting | off |
 | `-a`, `--include-sub-agents` | Include `agent-*.jsonl` sub-agent files | off |
+| `-p`, `--show-params` | Include tool-call inputs (MCP parameters, Skill args), for debugging. Don't share an export made with it | off |
 
 ### Sub-agent sessions
 

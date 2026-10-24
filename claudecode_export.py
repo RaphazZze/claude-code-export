@@ -279,8 +279,14 @@ def parse_timestamp(ts_raw, time_format):
 
 # ── Core conversion ────────────────────────────────────────────────────────
 
-def convert(jsonl_path, user_label, assistant_label, time_format):
-    """Parse a .jsonl session file and return (markdown_string, message_count, start_datetime)."""
+def convert(jsonl_path, user_label, assistant_label, time_format, show_params=False):
+    """Parse a .jsonl session file and return (markdown_string, message_count, start_datetime).
+
+    `show_params` adds each MCP call's input parameters under its header, and
+    a Skill call's args after its name. Off by default: those inputs are
+    search queries, prompts and whole email drafts with their recipients,
+    which an export meant for sharing must not carry.
+    """
 
     # First pass: find project root and first timestamp from first non-snapshot record
     project_root = None
@@ -555,26 +561,30 @@ def convert(jsonl_path, user_label, assistant_label, time_format):
                                 sk = inp.get('skill', '')
                                 if sk:
                                     marker = f"> `⚙` Skill: **{sk}**"
+                                    # Args are free text — a name, a query, a
+                                    # draft's subject — so they are a tool input
+                                    # like any MCP parameter.
                                     skill_args = inp.get('args')
-                                    if skill_args:
+                                    if skill_args and show_params:
                                         marker += f" — `{skill_args}`"
                                     text_parts.append(marker)
                             elif name.startswith('mcp__'):
-                                # MCP tool call — show tool name and inputs
+                                # MCP tool call — the tool name, and its inputs
+                                # only when asked for (see convert's docstring).
                                 # mcp__glean_default__chat → Glean: chat
                                 parts = name.split('__')
                                 server = parts[1] if len(parts) > 1 else ''
                                 method = parts[-1] if len(parts) > 2 else name
                                 label = server.replace('_default', '').replace('_', ' ').title()
                                 header = f"> `⚡` {label}: {method}"
-                                # Show all input params in the same blockquote as the
-                                # tool name, separated from it by a blank quote line.
+                                # Params go in the same blockquote as the tool
+                                # name, separated from it by a blank quote line.
                                 # Every line of a multi-line value needs the prefix
                                 # too — otherwise the quote ends at the first newline
                                 # and the remainder (an email body, a document)
                                 # spills into the page as unquoted markup.
                                 param_lines = []
-                                for k, v in inp.items():
+                                for k, v in (inp.items() if show_params else ()):
                                     v_str = str(v)
                                     if '\n' in v_str:
                                         quoted = '\n'.join(
@@ -798,6 +808,13 @@ def main():
              "Claude Code's Task tool and typically contain only internal "
              "tool-use traces without user messages.",
     )
+    parser.add_argument(
+        "-p", "--show-params",
+        action="store_true",
+        help="include tool-call inputs: MCP parameters (queries, prompts, "
+             "email drafts) and Skill args. By default only the tool name is "
+             "shown, so tool inputs stay out of a shared export.",
+    )
 
     args = parser.parse_args()
 
@@ -842,7 +859,8 @@ def main():
             continue
 
         try:
-            md, (user_c, asst_c), start_dt = convert(jsonl_path, args.name, args.assistant_name, args.time)
+            md, (user_c, asst_c), start_dt = convert(jsonl_path, args.name, args.assistant_name, args.time,
+                                                     show_params=args.show_params)
             short_id = jsonl_path.stem[:5]
             if start_dt:
                 stamp = start_dt.strftime('%Y-%m-%d_%H%M')
