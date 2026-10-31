@@ -154,7 +154,7 @@ Claude Code stores sessions per project at:
 ~/.claude/projects/<project-folder>/*.jsonl
 ```
 
-The `<project-folder>` name is derived from the working directory path with `/` replaced by `-`.
+The `<project-folder>` name is derived from the working directory path, with every character other than ASCII letters and digits (`/`, spaces and dots included) replaced by `-`.
 
 ## Requirements
 
