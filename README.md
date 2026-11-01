@@ -133,6 +133,7 @@ Example: `session_export_2026-03-24_1807_ffaab.md`
 ```bash
 python3 tests/test_export.py            # run
 python3 tests/test_export.py --update   # regenerate the expected export
+python3 tests/test_autodetect.py        # /export-session's folder auto-detect
 ```
 
 `tests/every_record_class.jsonl` holds one record of every class this tool has
@@ -154,7 +155,7 @@ Claude Code stores sessions per project at:
 ~/.claude/projects/<project-folder>/*.jsonl
 ```
 
-The `<project-folder>` name is derived from the working directory path, with every character other than ASCII letters and digits (`/`, spaces and dots included) replaced by `-`.
+The `<project-folder>` name is derived from the working directory path, with every character other than ASCII letters and digits (`/`, spaces and dots included) replaced by `-`, counted in UTF-16 code units (an emoji becomes two or more dashes). A name over 200 characters is cut to 200 and gets `-` plus a hash of the path. `/export-session` reproduces this when it auto-detects the session.
 
 ## Requirements
 

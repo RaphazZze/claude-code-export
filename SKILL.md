@@ -13,15 +13,38 @@ Use the AskUserQuestion tool with a single question: "What's your name? (used to
 **Step 2 — Resolve the `.jsonl` input file.**
 
 - If a path is provided as an argument, use it as the path to the `.jsonl` file.
-- Otherwise, auto-detect: convert the current working directory path to the project folder name (replace every character other than ASCII letters and digits (`/`, spaces and dots included) with `-`, keeping the leading `-`), then pick the most recently modified `.jsonl` file inside `~/.claude/projects/<project-folder>/`.
+- Otherwise, auto-detect from this project's session folder under `~/.claude/projects/` (or `$CLAUDE_CONFIG_DIR/projects/`): the current session's `.jsonl` (`$CLAUDE_CODE_SESSION_ID`), else the most recently modified one.
 
-Use a short Bash snippet to resolve the path if auto-detecting:
+Run this snippet as is to auto-detect (do not modify it; it reproduces Claude Code's default folder naming, checked by `tests/test_autodetect.py`):
 
 ```bash
-ls -t ~/.claude/projects/"$(pwd | sed 's|[^A-Za-z0-9]|-|g')"/*.jsonl 2>/dev/null | head -1
+python3 -I - <<'PY'
+import glob, os, unicodedata as u
+def units(s): return [c for ch in s for c in ([ord(ch)] if ord(ch) < 0x10000 else [0xD800 + ((ord(ch) - 0x10000) >> 10), 0xDC00 + ((ord(ch) - 0x10000) & 0x3FF)])]
+def b36(n):
+    d = ""
+    while True:
+        n, r = divmod(n, 36); d = "0123456789abcdefghijklmnopqrstuvwxyz"[r] + d
+        if not n: return d
+def slug(p):
+    cu = units(p)
+    s = "".join(chr(c) if c < 128 and chr(c).isalnum() else "-" for c in cu)
+    if len(s) <= 200: return s
+    h = 0
+    for c in cu: h = (h * 31 + c) & 0xFFFFFFFF
+    h = h - (1 << 32) if h >= 1 << 31 else h
+    return s[:200] + "-" + b36(abs(h))
+root = os.path.join(os.environ.get("CLAUDE_CONFIG_DIR") or os.path.expanduser("~/.claude"), "projects")
+paths = {u.normalize(f, p) for p in {os.environ.get("PWD", ""), os.getcwd()} if p for f in ("NFC", "NFD")}
+names = {slug(p) for p in paths} | ({os.environ["CLAUDE_CODE_PROJECT_DIR_NAME"]} if os.environ.get("CLAUDE_CODE_PROJECT_DIR_NAME") else set())
+found = [j for n in names for j in glob.glob(os.path.join(glob.escape(os.path.join(root, n)), "*.jsonl"))]
+sid = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
+mine = [j for j in found if os.path.basename(j) == sid + ".jsonl"]
+print(mine[0] if mine else max(found, key=os.path.getmtime) if found else "")
+PY
 ```
 
-If it prints nothing, ask the user for the `.jsonl` path: Claude Code shortens a mapped name over 200 characters and adds a hash suffix, and a path with non-ASCII characters may map differently.
+If it prints nothing, no session folder with a `.jsonl` matched this directory: ask the user for the `.jsonl` path.
 
 **Step 3 — Run the export using the Bash tool.**
 
