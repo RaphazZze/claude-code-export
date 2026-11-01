@@ -19,7 +19,7 @@ Run this snippet as is to auto-detect (do not modify it; it reproduces Claude Co
 
 ```bash
 python3 -I - <<'PY'
-import glob, os, unicodedata as u
+import glob, os, sys, unicodedata as u
 def units(s): return [c for ch in s for c in ([ord(ch)] if ord(ch) < 0x10000 else [0xD800 + ((ord(ch) - 0x10000) >> 10), 0xDC00 + ((ord(ch) - 0x10000) & 0x3FF)])]
 def b36(n):
     d = ""
@@ -41,10 +41,25 @@ found = [j for n in names for j in glob.glob(os.path.join(glob.escape(os.path.jo
 sid = os.environ.get("CLAUDE_CODE_SESSION_ID", "")
 mine = [j for j in found if os.path.basename(j) == sid + ".jsonl"]
 print(mine[0] if mine else max(found, key=os.path.getmtime) if found else "")
+def state(p):
+    try: os.listdir(p); return "ok"
+    except (FileNotFoundError, NotADirectoryError): return "missing"
+    except OSError: return "unreadable"
+if not found:
+    s = state(root)
+    if s != "ok":
+        why = ("no projects folder at " if s == "missing" else "cannot read ") + root
+    else:
+        hits = [(f, state(f)) for f in (os.path.join(root, n) for n in sorted(names))]
+        bad = [f for f, s in hits if s == "unreadable"]
+        empty = [f for f, s in hits if s == "ok"]
+        why = (f"cannot read {bad[0]}" if bad else f"no .jsonl in {empty[0]}" if empty else
+               f"no session folder for this directory in {root}")
+    print(f"auto-detect: {why}", file=sys.stderr)
 PY
 ```
 
-If it prints nothing, no session folder with a `.jsonl` matched this directory: ask the user for the `.jsonl` path.
+If it prints no path, tell the user the reason it printed (`auto-detect: …`), then ask for the `.jsonl` path.
 
 **Step 3 — Run the export using the Bash tool.**
 
