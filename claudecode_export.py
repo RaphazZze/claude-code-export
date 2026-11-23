@@ -279,13 +279,19 @@ def parse_timestamp(ts_raw, time_format):
 
 # ── Core conversion ────────────────────────────────────────────────────────
 
-def convert(jsonl_path, user_label, assistant_label, time_format, show_params=False):
+def convert(jsonl_path, user_label, assistant_label, time_format, show_params=False,
+            show_reads=True, show_writes=True):
     """Parse a .jsonl session file and return (markdown_string, message_count, start_datetime).
 
     `show_params` adds each MCP call's input parameters under its header, and
     a Skill call's args after its name. Off by default: those inputs are
     search queries, prompts and whole email drafts with their recipients,
     which an export meant for sharing must not carry.
+
+    `show_reads` keeps a marker for each file the assistant read, and
+    `show_writes` one for each file it created or modified. Both are on by
+    default; the path is the only thing either marker shows, sanitized like
+    any other path.
     """
 
     # First pass: find project root and first timestamp from first non-snapshot record
@@ -525,13 +531,17 @@ def convert(jsonl_path, user_label, assistant_label, time_format, show_params=Fa
                             name = block.get('name', '')
                             inp = block.get('input', {})
                             tid = block.get('id', '')
-                            if name == 'Write':
+                            if name == 'Read':
                                 fp = inp.get('file_path', '')
-                                if fp:
+                                if fp and show_reads:
+                                    text_parts.append(f"> `≡` Read `{rel(fp)}`")
+                            elif name == 'Write':
+                                fp = inp.get('file_path', '')
+                                if fp and show_writes:
                                     text_parts.append(f"> `+` Created `{rel(fp)}`")
                             elif name == 'Edit':
                                 fp = inp.get('file_path', '')
-                                if fp:
+                                if fp and show_writes:
                                     text_parts.append(f"> `~` Modified `{rel(fp)}`")
                             elif name == 'Bash':
                                 # Only the one-line description — never the
@@ -764,7 +774,7 @@ def convert(jsonl_path, user_label, assistant_label, time_format, show_params=Fa
     return output, (user_count, assistant_count), first_timestamp
 
 
-def count_messages(jsonl_path):
+def count_messages(jsonl_path, show_reads=True, show_writes=True):
     """Return (user_count, assistant_count) for a session file.
 
     Delegates to convert() and discards the Markdown. This was a second
@@ -777,8 +787,11 @@ def count_messages(jsonl_path):
     there and not one here.
 
     One route to one answer is worth more than the Markdown it throws away.
+    The read and write switches are passed through for the same reason: a
+    turn holding only file markers is a message with them and none without.
     """
-    _, counts, _ = convert(jsonl_path, "User", "Claude", "12")
+    _, counts, _ = convert(jsonl_path, "User", "Claude", "12",
+                           show_reads=show_reads, show_writes=show_writes)
     return counts
 
 
@@ -815,6 +828,18 @@ def main():
              "email drafts) and Skill args. By default only the tool name is "
              "shown, so tool inputs stay out of a shared export.",
     )
+    parser.add_argument(
+        "--no-reads",
+        action="store_true",
+        help="leave out the marker for each file the assistant read "
+             "(shown by default).",
+    )
+    parser.add_argument(
+        "--no-writes",
+        action="store_true",
+        help="leave out the markers for files the assistant created or "
+             "modified (shown by default).",
+    )
 
     args = parser.parse_args()
 
@@ -829,7 +854,9 @@ def main():
             if is_sub_agent_file(jsonl_path) and not args.include_sub_agents:
                 continue
             try:
-                user_c, asst_c = count_messages(jsonl_path)
+                user_c, asst_c = count_messages(jsonl_path,
+                                                show_reads=not args.no_reads,
+                                                show_writes=not args.no_writes)
                 print(f"{jsonl_path.name}\t{user_c + asst_c}\t({user_c} user, {asst_c} {args.assistant_name})")
             except Exception as e:
                 print(f"{jsonl_path.name}\tERROR: {e}", file=sys.stderr)
@@ -860,7 +887,9 @@ def main():
 
         try:
             md, (user_c, asst_c), start_dt = convert(jsonl_path, args.name, args.assistant_name, args.time,
-                                                     show_params=args.show_params)
+                                                     show_params=args.show_params,
+                                                     show_reads=not args.no_reads,
+                                                     show_writes=not args.no_writes)
             short_id = jsonl_path.stem[:5]
             if start_dt:
                 stamp = start_dt.strftime('%Y-%m-%d_%H%M')

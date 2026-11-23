@@ -20,7 +20,10 @@ ever mishandled, so the diff below is the guard on all of them at once:
   - a sidechain record, and a `file-history-snapshot` record
   - a `Bash` call (description only, never the command) and one with no
     description at all
-  - `Write`, `Edit`, `Skill` with args, `Agent` with a type and a model
+  - `Read`, `Write`, `Edit`, `Skill` with args, `Agent` with a type and a
+    model. Read and write markers show by default; `--no-reads` and
+    `--no-writes` each drop their own markers and leave the other's, checked
+    through the command line
   - an MCP call with a single-line and a multi-line parameter, which by
     default shows the tool name only, as does the `Skill` call; with
     `show_params` the parameters and args render, the multi-line one quoted
@@ -145,6 +148,11 @@ SHOW_PARAMS_REQUIRED = [
     "Skill: **data-export** — `--dry-run`",
 ]
 
+# The file markers each switch controls. Each switch must drop its own and
+# keep the other's, so a flag wired to the wrong marker fails here.
+READ_MARKERS = ["`≡` Read `README.md`"]
+WRITE_MARKERS = ["`+` Created `src/app.py`", "`~` Modified `notes/plan.md`"]
+
 EXPORT_DATE_RE = re.compile(r"^\*\*Exported:\*\* \d{4}-\d{2}-\d{2}$", re.M)
 EXPORT_DATE_PLACEHOLDER = "**Exported:** <NORMALISED>"
 
@@ -252,8 +260,23 @@ def main():
         if needle not in cli_params:
             failures.append(f"--show-params on the command line did not render {needle!r}")
 
+    cli_no_reads, cli_no_writes = run_cli("--no-reads"), run_cli("--no-writes")
+    file_checks = [
+        ("the default export", cli_default, READ_MARKERS + WRITE_MARKERS, []),
+        ("--no-reads", cli_no_reads, WRITE_MARKERS, READ_MARKERS),
+        ("--no-writes", cli_no_writes, READ_MARKERS, WRITE_MARKERS),
+    ]
+    for label, md, required, absent in file_checks:
+        for needle in required:
+            if needle not in md:
+                failures.append(f"{label} is missing the marker {needle!r}")
+        for needle in absent:
+            if needle in md:
+                failures.append(f"{label} still shows the marker {needle!r}")
+
     checks = (3 + len(FORBIDDEN) + len(SHOW_PARAMS_REQUIRED)
-              + len(PARAM_NEEDLES) + len(SHOW_PARAMS_REQUIRED))
+              + len(PARAM_NEEDLES) + len(SHOW_PARAMS_REQUIRED)
+              + sum(len(r) + len(a) for _, _, r, a in file_checks))
     if failures:
         for f in failures:
             print(f"FAIL  {f}")
@@ -263,7 +286,8 @@ def main():
     print(f"PASS  {checks} checks · {len(actual.splitlines())} lines · "
           f"{counts[0]} user / {counts[1]} assistant messages · "
           f"tool inputs absent by default and present with --show-params, "
-          f"through convert() and the command line")
+          f"through convert() and the command line · read and write markers "
+          f"on by default, each switched off alone")
     return 0
 
 

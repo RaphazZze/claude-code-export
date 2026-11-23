@@ -25,6 +25,8 @@ Reading it now.
 
 ### ❯ Claude · 2:31 PM
 
+> `≡` Read `README.md`
+>
 > `+` Created `src/app.py`
 >
 > `~` Modified `.claude/settings.json`

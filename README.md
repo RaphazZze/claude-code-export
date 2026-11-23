@@ -11,7 +11,8 @@ Claude Code stores every session as a raw `.jsonl` file. This tool parses those 
 - All user and assistant text messages
 - Queued messages — text typed while Claude is mid-turn, which the harness
   stores as an attachment rather than a user message
-- File creations (`+`) and modifications (`~`)
+- File reads (`≡`), creations (`+`) and modifications (`~`) — the path only.
+  Turn them off with `--no-reads` and `--no-writes`
 - Shell commands (`$`) — the one-line description only, never the command
 - Sub-agent dispatches (description, agent type and model)
 - Skill invocations (name only — marked as `⚙ Skill: <name>`, attributed to
@@ -115,6 +116,8 @@ python3 claudecode_export.py --help
 | `-c`, `--count-only` | Print message counts without exporting | off |
 | `-a`, `--include-sub-agents` | Include `agent-*.jsonl` sub-agent files | off |
 | `-p`, `--show-params` | Include tool-call inputs (MCP parameters, Skill args), for debugging. Don't share an export made with it | off |
+| `--no-reads` | Leave out the marker for each file the assistant read | reads shown |
+| `--no-writes` | Leave out the markers for files the assistant created or modified | writes shown |
 
 ### Sub-agent sessions
 
